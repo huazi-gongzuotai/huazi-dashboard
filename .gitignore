@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# 依赖（平台构建时自动安装）
+node_modules/
+
+# 日志
+*.log

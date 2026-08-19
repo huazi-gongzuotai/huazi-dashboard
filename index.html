@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  华子的工作台                                                 ║
+  ║  由 不一书个人工作台生成器 (bys-personal-dashboard) 生成       ║
+  ╠══════════════════════════════════════════════════════════════╣
+  ║  改这个文件时请遵守：                                          ║
+  ║  1. 每个功能必须被分区标记包裹，且 START 和 END 的功能名        ║
+  ║     必须一字不差（HTML 和 JS 两处都要）                        ║
+  ║  2. 数据读写只走 Store.*，不要直接碰 localStorage             ║
+  ║  3. 输入框 font-size 不能小于 16px                            ║
+  ║  4. 敏感数据（API key）走 Store.setSecret，不进备份            ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>华子的工作台</title>
+
+<!-- PWA：这四行决定了"添加到主屏幕"之后是不是全屏、图标好不好看 -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="华子">
+<meta name="theme-color" content="#f7f2ea">
+
+<style>
+/* ==== 主题变量（奶油暖棕 · 第 4 步定版） ==== */
+:root{
+  --bg:#f1ebe3;
+  --sidebar:#f7f2ea;
+  --sidebar-text:#6b5f52;
+  --sidebar-active:#2d2620;
+  --card:#fffdf9;
+  --text:#3d352c;
+  --text-dim:#9c8f80;
+  --text2:#8a7c6e;          /* 次级文字：比 --text 淡一档，标签/说明用 */
+  --accent:#a9714b;
+  --radius:16px;
+  --shadow:0 2px 10px rgba(120,100,80,.08);
+  --font:-apple-system,"PingFang SC",system-ui,sans-serif;
+  --line:#e4dacc;          /* 1px 细边框色。现代审美用细线，不用投影 */
+
+  /* 字号阶梯 —— 故意拉开跨度。所有字号都差不多，是业余感最大的来源 */
+  --fs-hero:40px;   /* 英雄元素：每页最大的那一个数字或标题，其余全部退后 */
+  --fs-title:22px;
+  --fs-body:16px;   /* 输入框不得低于 16px，否则 iOS 会自动放大整页 */
+  --fs-meta:13px;
+
+  --pad:18px;       /* 卡片内边距。留白是最便宜的高级感，宽屏下会变大 */
+  --gap:12px;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);
+  --dur:.18s;
+}
+
+/* ==== 基础 ==== */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:var(--font); background:var(--bg); color:var(--text);
+  font-size:var(--fs-body); line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden; /* 整页不滚，只让内容区滚 —— 避免 iOS 橡皮筋把侧边栏拽走 */
+}
+.app{display:flex;height:100%}
+
+/* ==== 侧边栏：常驻窄条 ==== */
+.side{
+  width:76px;flex-shrink:0;background:var(--sidebar);
+  display:flex;flex-direction:column;
+  padding:calc(12px + env(safe-area-inset-top,0)) 6px calc(12px + env(safe-area-inset-bottom,0));
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+.side::-webkit-scrollbar{display:none}
+.brand{text-align:center;margin-bottom:14px;flex-shrink:0}
+.brand .logo{font-size:26px;line-height:1}
+.brand .name{font-size:11px;color:var(--sidebar-text);opacity:.85;margin-top:4px;line-height:1.3;word-break:break-all}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav button{
+  border:none;background:transparent;font-family:inherit;
+  padding:10px 2px;border-radius:12px;
+  color:var(--sidebar-text);font-size:11px;line-height:1.3;
+}
+.nav button .ico{display:block;font-size:21px;margin-bottom:3px}
+.nav button.on{background:var(--sidebar-active);color:#fff}
+
+/* ==== 内容区 ==== */
+.main{
+  flex:1;min-width:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:calc(14px + env(safe-area-inset-top,0)) 12px calc(28px + env(safe-area-inset-bottom,0));
+  scroll-behavior:smooth;
+}
+.page{display:none;flex-direction:column;gap:var(--gap)}
+.page.on{display:flex}
+.page-title{font-size:var(--fs-title);font-weight:500;line-height:1.25;letter-spacing:-.01em;margin-bottom:2px}
+.page-sub{font-size:var(--fs-meta);color:var(--text-dim);margin-top:-6px;margin-bottom:2px}
+
+/* ==== 卡片 ==== */
+.card{
+  background:var(--card);border-radius:var(--radius);
+  border:1px solid var(--line);   /* 细线代替投影 */
+  box-shadow:var(--shadow);padding:var(--pad);
+}
+.card h2{font-size:17px;font-weight:500;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.hint{font-size:var(--fs-meta);color:var(--text-dim);margin-top:8px;line-height:1.6}
+.empty{font-size:var(--fs-meta);color:var(--text-dim);text-align:center;padding:22px 0}
+
+/* 英雄元素：每页最大的那一个。数字一律等宽，对齐后立刻专业 */
+.hero{font-size:var(--fs-hero);font-weight:500;line-height:1.1;letter-spacing:-.01em}
+.num,.hero{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.unit{font-size:var(--fs-meta);color:var(--text-dim);font-weight:400;margin-left:5px}
+
+/* ==== 表单：字号必须 >=16px，否则 iOS 会自动放大整页 ==== */
+input,textarea,select{
+  transition:border-color var(--dur) var(--ease);
+  width:100%;font-size:var(--fs-body);font-family:inherit;color:var(--text);line-height:1.5;
+  padding:11px 13px;border:1px solid rgba(128,128,128,.28);
+  border-radius:calc(var(--radius) - 6px);background:transparent;
+}
+textarea{min-height:88px;resize:vertical;line-height:1.6}
+input::placeholder,textarea::placeholder{color:var(--text-dim)}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
+.btn{
+  padding:11px 18px;font-size:15px;font-family:inherit;white-space:nowrap;
+  border:none;border-radius:calc(var(--radius) - 6px);
+  background:var(--accent);color:#fff;
+}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid rgba(128,128,128,.3)}
+.btn.danger{background:#d9534f}
+.btn:active{opacity:.75}
+.row{display:flex;gap:8px;align-items:center}
+.row .btn{flex-shrink:0}
+
+/* ==== 列表 ==== */
+.item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px dashed rgba(128,128,128,.22)}
+.item:last-child{border-bottom:none}
+.item .grow{flex:1;min-width:0;line-height:1.6}
+.item .del{color:var(--text-dim);font-size:16px;background:none;border:none;padding:0 4px;flex-shrink:0}
+.box{
+  width:21px;height:21px;flex-shrink:0;margin-top:1px;
+  border:2px solid var(--accent);border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;color:#fff;background:transparent;
+}
+.item.done .box{background:var(--accent)}
+.item.done .grow{text-decoration:line-through;color:var(--text-dim)}
+
+/* ==== 提示条 ==== */
+.banner{
+  background:var(--accent);color:#fff;padding:11px 14px;
+  border-radius:var(--radius);font-size:13px;line-height:1.5;
+  display:flex;align-items:center;gap:10px;
+}
+.banner button{
+  margin-left:auto;flex-shrink:0;background:rgba(255,255,255,.22);color:#fff;
+  border:none;padding:6px 12px;border-radius:8px;font-size:13px;font-family:inherit;
+}
+.toast{
+  position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom,0));
+  transform:translateX(-50%) translateY(8px);z-index:99;
+  background:rgba(0,0,0,.82);color:#fff;padding:10px 18px;border-radius:20px;
+  font-size:14px;opacity:0;pointer-events:none;
+  transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ════════ 动画 ════════
+   只做「让状态变化可理解」的动画，不做炫技的。
+   这是一天开十次的工具，任何多余动效第十次看就烦了。 */
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.page.on > *{animation:rise .26s var(--ease) both}
+/* 错开进场，形成自上而下的节奏，只错开前几个免得末尾等太久 */
+.page.on > *:nth-child(1){animation-delay:0s}
+.page.on > *:nth-child(2){animation-delay:.03s}
+.page.on > *:nth-child(3){animation-delay:.06s}
+.page.on > *:nth-child(4){animation-delay:.09s}
+.page.on > *:nth-child(n+5){animation-delay:.12s}
+
+.nav button,.btn,.card,.item .box{transition:all var(--dur) var(--ease)}
+.btn:active{opacity:.75;transform:scale(.98)}
+.item .box{transform:scale(1)}
+.item.done .box{animation:pop .22s var(--ease)}
+@keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.18)}100%{transform:scale(1)}}
+
+/* 用户在系统里关了动效就一律不放 —— 这不是可选项 */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-delay:0s !important;
+    transition-duration:.01ms !important;scroll-behavior:auto !important}
+}
+
+/* ════════ 平板与横屏：侧栏展开成图标配文字 ════════ */
+@media (min-width:700px){
+  :root{--fs-hero:48px;--fs-title:26px;--pad:24px;--gap:16px}
+  .side{width:200px;padding-left:12px;padding-right:12px}
+  .brand{text-align:left;padding:0 8px;margin-bottom:22px}
+  .brand .logo{font-size:30px}
+  .brand .name{font-size:14px;margin-top:6px;word-break:normal}
+  .nav{gap:2px}
+  .nav button{
+    display:flex;align-items:center;gap:12px;text-align:left;
+    padding:12px 14px;font-size:15px;
+  }
+  .nav button .ico{display:inline;font-size:20px;margin:0;width:24px;text-align:center}
+  .main{padding:28px 32px 40px}
+}
+
+/* ════════ 桌面：卡片并排 ════════
+   标题、副标题、提示条永远占满整行；卡片默认半宽。
+   需要占满的重要卡片（英雄卡、长列表）加 class="card wide"。 */
+@media (min-width:1100px){
+  :root{--fs-hero:56px;--fs-title:30px;--pad:30px;--gap:20px}
+  .side{width:240px}
+  .main{padding:36px 44px 52px}
+  .page.on{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:var(--gap);align-content:start;
+  }
+  .page.on > .page-title,
+  .page.on > .page-sub,
+  .page.on > .banner,
+  .page.on > .card.wide{grid-column:1 / -1}
+}
+
+/* 超宽屏限制内容宽度并居中 —— 一行文字超过 40 个汉字就难读了 */
+@media (min-width:1700px){
+  .main > .page.on{max-width:1400px;margin:0 auto}
+}
+
+/* ════════ 功能扩展样式 ════════ */
+
+/* 日历 */
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-head .m{font-size:17px;font-weight:500}
+.cal-head button{
+  border:1px solid var(--line);background:var(--card);color:var(--text);
+  width:34px;height:34px;border-radius:10px;font-size:15px;font-family:inherit;
+}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-grid .wd{font-size:11px;color:var(--text-dim);text-align:center;padding:4px 0}
+.cal-d{
+  position:relative;text-align:center;padding:9px 0;font-size:14px;
+  border-radius:10px;cursor:pointer;font-variant-numeric:tabular-nums;
+}
+.cal-d.empty{visibility:hidden}
+.cal-d.today{background:var(--accent);color:#fff;font-weight:600}
+.cal-d.sel{background:var(--sidebar-active);color:#fff}
+.cal-d .dot{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:3px;
+  width:4px;height:4px;border-radius:50%;background:var(--accent);
+}
+.cal-d.today .dot,.cal-d.sel .dot{background:#fff}
+.cal-d .dot.overdue{background:#d9534f}
+.cal-d.today .dot.overdue,.cal-d.sel .dot.overdue{background:#ffb3b0}
+
+/* 时间标签 */
+.time-tag{
+  font-size:12px;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);
+  padding:2px 8px;border-radius:6px;flex-shrink:0;font-variant-numeric:tabular-nums;
+}
+.time-tag.overdue{color:#d9534f;background:rgba(217,83,79,.1)}
+.sub-h{
+  font-size:13px;color:var(--text-dim);margin:2px 0 -2px;
+  display:flex;align-items:center;gap:6px;
+}
+.sub-h::before{content:"";width:3px;height:12px;background:var(--accent);border-radius:2px}
+
+/* 标签筛选 chips */
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{
+  font-size:13px;padding:5px 12px;border-radius:14px;border:1px solid var(--line);
+  background:transparent;color:var(--text-dim);font-family:inherit;
+}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* 医生卡 */
+.doc-card{cursor:pointer}
+.doc-card .dhead{display:flex;align-items:center;gap:12px}
+.doc-card .avatar{
+  width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;
+}
+.doc-card .dname{font-size:16px;font-weight:600}
+.doc-card .dsub{font-size:13px;color:var(--text-dim);margin-top:2px}
+.doc-card .dbody{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;display:none}
+.doc-card.open .dbody{display:block}
+.kv{margin-bottom:8px;line-height:1.7}
+.kv b{font-size:13px;color:var(--text-dim);font-weight:400;display:block}
+.kv span{font-size:14px;white-space:pre-wrap}
+
+/* AI 对话 */
+.chat{display:flex;flex-direction:column;gap:10px;min-height:120px}
+.msg{
+  max-width:86%;padding:10px 14px;border-radius:14px;font-size:15px;line-height:1.7;
+  white-space:pre-wrap;word-break:break-word;
+}
+.msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:var(--bg);border:1px solid var(--line);
+  border-bottom-left-radius:4px;color:var(--text)}
+.msg.ai.err{color:#d9534f}
+.typing{align-self:flex-start;color:var(--text-dim);font-size:13px;padding:4px 2px}
+
+/* 热力图（喝水 7 天） */
+.heat{display:flex;gap:6px;margin-top:12px}
+.heat .cell{
+  flex:1;height:38px;border-radius:10px;background:var(--bg);border:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+}
+.heat .cell b{font-size:14px;font-variant-numeric:tabular-nums}
+.heat .cell i{font-style:normal;font-size:10px;color:var(--text-dim)}
+.heat .cell.full{background:var(--accent);border-color:var(--accent)}
+.heat .cell.full b,.heat .cell.full i{color:#fff}
+
+/* 代码卡片 */
+.code-card pre{
+  background:#2d2620;color:#f2ece1;border-radius:12px;padding:14px;
+  font-family:var(--mono);font-size:13px;line-height:1.7;overflow-x:auto;
+  white-space:pre;margin-top:10px;
+}
+.code-card .tag{font-size:12px;color:var(--accent);margin-left:auto}
+
+/* 锁屏 */
+.lock-box{text-align:center;padding:40px 0}
+.lock-box .big-ico{font-size:44px;margin-bottom:14px}
+
+/* ==== 资料库 v2：文件夹 + 文件 ==== */
+.breadcrumb{display:flex;align-items:center;gap:3px;font-size:15px;flex-wrap:wrap}
+.breadcrumb .sep{color:var(--text-dim)}
+.breadcrumb button{background:none;border:none;color:var(--text);font-size:15px;padding:4px 5px;font-family:inherit;border-radius:6px}
+.breadcrumb button:active{background:rgba(128,128,128,.15)}
+.breadcrumb button.cur{font-weight:600;color:var(--accent)}
+.fitem{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px dashed rgba(128,128,128,.22);min-width:0}
+.fitem:last-child{border-bottom:none}
+.fitem .ico{font-size:20px;flex-shrink:0}
+.fitem .grow{flex:1;min-width:0}
+.fitem .name{font-size:15px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.fitem .meta{font-size:12px;color:var(--text-dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fitem button{color:var(--text-dim);background:none;border:none;font-size:14px;padding:4px 6px;flex-shrink:0;font-family:inherit}
+.fitem button:active{opacity:.6}
+.dropzone{border:2px dashed rgba(128,128,128,.35);border-radius:calc(var(--radius) - 6px);padding:14px;text-align:center;color:var(--text-dim);font-size:14px;margin-top:12px}
+.dropzone.over{border-color:var(--accent);color:var(--accent);background:rgba(169,113,75,.08)}
+.overlay{position:fixed;inset:0;background:rgba(30,24,18,.45);z-index:60;display:flex;align-items:center;justify-content:center;padding:18px}
+.modal{background:var(--card);border-radius:var(--radius);padding:18px;width:100%;max-width:430px;box-shadow:0 14px 44px rgba(0,0,0,.28)}
+.modal.wide{max-width:780px}
+.modal h2{font-size:16px;font-weight:600;margin-bottom:12px}
+.file-miss{color:var(--text-dim);font-size:14px;line-height:1.8;padding:22px 0;text-align:center}
+#refViewBody iframe,#refViewBody embed{width:100%;height:60vh;border:none;border-radius:calc(var(--radius) - 8px);background:#fff}
+#refViewBody img{max-width:100%;border-radius:calc(var(--radius) - 8px)}
+#refViewBody .doc-hint{color:var(--text-dim);font-size:14px;text-align:center;padding:30px 0;line-height:1.9}
+/* 图片缩略图网格 */
+.img-grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.img-grid .thumb{width:calc(33.333% - 7px);aspect-ratio:1;border-radius:12px;overflow:hidden;position:relative;cursor:pointer;background:var(--sidebar)}
+.img-grid .thumb img{width:100%;height:100%;object-fit:cover}
+.img-grid .thumb .tdel{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.45);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.img-grid .thumb .tdel:active{opacity:.7}
+.img-grid .empty-i{width:100%;color:var(--text-dim);font-size:13px;text-align:center;padding:6px 0}
+
+/* 医生信息行 */
+.doc-info-row{display:flex;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.doc-info-row:last-child{border-bottom:none}
+.doc-info-row b{min-width:72px;color:var(--text-dim);font-weight:500;font-size:14px;flex-shrink:0}
+.doc-info-row span{flex:1;font-size:14px;line-height:1.6;white-space:pre-wrap}
+
+/* 日历有日志标记 */
+.cal-d.has-diary{font-weight:700}
+.cal-d.has-diary::after{content:'';position:absolute;left:50%;transform:translateX(-50%);bottom:3px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.cal-d.today.has-diary::after,.cal-d.sel.has-diary::after{background:#fff}
+
+/* 备忘录列表 */
+.memo-item{padding:14px 0;border-bottom:1px dashed rgba(128,128,128,.22);cursor:pointer}
+.memo-item:last-child{border-bottom:none}
+.memo-item:active{opacity:.7}
+.memo-item .mt{font-size:15px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.memo-item .mp{font-size:13px;color:var(--text-dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.memo-item .md{font-size:11px;color:var(--text-dim);margin-top:2px}
+
+/* 通用图片预览弹层 body */
+.view-body img{max-width:100%;border-radius:calc(var(--radius) - 8px)}
+
+/* ===== 业绩看板 v2：皮肤/外科拆分 + 月历 ===== */
+.perf-split{display:flex;flex-direction:column;gap:10px}
+.perf-cat{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px}
+.perf-cat-title{font-size:14px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.perf-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.perf-cat label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px}
+.perf-cat input{width:100%;font-size:18px;font-weight:600;padding:10px 12px}
+.perf-cat-foot{font-size:12px;color:var(--text2);margin-top:8px}
+.cal-d.has-perf{font-weight:700}
+.cal-d.has-perf::after{content:'';position:absolute;left:50%;transform:translateX(-50%);bottom:3px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.cal-d.today.has-perf::after,.cal-d.sel.has-perf::after{background:#fff}
+.perf-day-empty{color:var(--text2);font-size:13px;text-align:center;padding:10px 0;background:var(--bg);border-radius:10px}
+.perf-day{background:var(--bg);border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.7}
+.perf-day-split{margin-top:8px;border-top:1px dashed var(--line);padding-top:8px;display:flex;flex-direction:column;gap:5px}
+.perf-day-cat{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--text2)}
+.perf-day-cat b{color:var(--text)}
+.perf-hist-split{font-size:11px;color:var(--text2);margin-top:1px}
+.trend-chart{display:flex;align-items:flex-end;gap:3px;height:100px;padding:4px 0;border-bottom:1px solid var(--line)}
+.trend-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0;cursor:default}
+.trend-bar .bar{width:100%;max-width:22px;border-radius:4px 4px 0 0;min-height:2px;transition:height .3s}
+.trend-bar .bar.c{background:var(--accent)}
+.trend-bar .bar.v{background:#c9a87c}
+.trend-bar .bar.d{background:#8db596}
+.trend-bar .lbl{font-size:9px;color:var(--text2);margin-top:3px;white-space:nowrap;overflow:hidden}
+.trend-bar .val{font-size:9px;color:var(--text2);margin-bottom:2px;white-space:nowrap}
+.target-bar{background:var(--bg);border-radius:8px;padding:10px 12px}
+.target-bar .track{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:6px}
+.target-bar .fill{height:100%;background:var(--accent);border-radius:4px;transition:width .4s}
+.target-bar .track.over .fill{background:#5a9e6f}
+.perf-hist-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.perf-hist-row:last-child{border-bottom:none}
+.perf-hist-row .d{font-size:13px;color:var(--text2);min-width:64px}
+.perf-hist-row .nums{flex:1;display:flex;gap:12px;flex-wrap:wrap}
+.perf-hist-row .nums span{font-size:13px}
+.perf-hist-row .nums b{font-size:14px}
+.perf-hist-row .del{font-size:12px;color:#c55;padding:2px 6px;border:none;background:none;cursor:pointer}
+.link-group{margin-bottom:12px}
+.link-group-title{font-size:13px;color:var(--text2);margin-bottom:6px;font-weight:600}
+.link-card{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg);border-radius:10px;margin-bottom:6px;cursor:pointer;border:1px solid transparent;transition:border-color .2s}
+.link-card:hover{border-color:var(--accent)}
+.link-card .ico{font-size:18px;flex-shrink:0}
+.link-card .info{flex:1;min-width:0}
+.link-card .info .n{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.link-card .info .u{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.link-card .act{display:flex;gap:4px;flex-shrink:0}
+.link-card .act button{font-size:12px;padding:4px 8px;border:1px solid var(--line);background:var(--card);border-radius:6px;cursor:pointer}
+.overlay-card{background:var(--card);border-radius:calc(var(--radius) - 4px);padding:14px;display:flex;flex-direction:column;max-height:90vh;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ==== 侧边栏 START ==== -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">🍊</div>
+      <div class="name">华子的工作台</div>
+    </div>
+    <nav class="nav" id="nav">
+      <!-- 由 App.routes 自动渲染 -->
+    </nav>
+  </aside>
+  <!-- ==== 侧边栏 END ==== -->
+
+  <main class="main" id="main">
+
+    <!-- ==== 功能：日历·计划 START ==== -->
+    <section class="page" id="page-plan">
+      <div class="page-title" id="planTitle">今天</div>
+      <div class="page-sub" id="planSub"></div>
+      <div class="card wide">
+        <div class="cal-head">
+          <button onclick="Plan.prevMonth()">‹</button>
+          <span class="m" id="calMonth"></span>
+          <button onclick="Plan.nextMonth()">›</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <p class="hint">点日期可以查看/安排那天的事；有小圆点 = 那天有事，红点 = 有过期未完成</p>
+      </div>
+      <div class="card wide" id="planOverdueCard" style="display:none">
+        <h2>⚠️ 过期未完成</h2>
+        <div id="planOverdue"></div>
+      </div>
+      <div class="card wide">
+        <h2 id="planListTitle">今天的事</h2>
+        <div id="planList"></div>
+      </div>
+      <div class="card wide">
+        <h2 id="planAddTitle">加一件事</h2>
+        <div class="row">
+          <input type="text" id="planText" placeholder="要做什么，如：写王医生口播脚本">
+        </div>
+        <div class="row" style="margin-top:10px">
+          <input type="date" id="planDate" style="flex:1">
+          <input type="time" id="planTime" style="width:120px">
+          <button class="btn" onclick="Plan.add()">添加</button>
+        </div>
+        <p class="hint">日期和时间都可以不填；填了时间会按时间排序</p>
+      </div>
+    </section>
+    <!-- ==== 功能：日历·计划 END ==== -->
+
+    <!-- ==== 功能：医生IP库 START ==== -->
+    <section class="page" id="page-docs">
+      <div class="page-title">医生 IP 库</div>
+      <div class="page-sub">每位医生一个专区：资料、排班表、价格表、海报，还带 AI 助手</div>
+
+      <!-- 根视图：文件夹 + 医生列表 -->
+      <div id="docsRoot">
+        <div class="card wide">
+          <div class="row" style="flex-wrap:wrap;align-items:center;gap:8px">
+            <div class="breadcrumb" id="docCrumb" style="flex:1;min-width:140px"></div>
+            <button class="btn ghost" onclick="Docs.newFolder()">📁 新建分组</button>
+            <button class="btn" onclick="Docs.newDoctor()">➕ 新增医生</button>
+          </div>
+        </div>
+        <div class="card wide" style="padding:0 var(--pad)">
+          <div id="docList"></div>
+        </div>
+      </div>
+
+      <!-- 医生详情页 -->
+      <div id="docsDetail" style="display:none">
+        <div class="card wide">
+          <div class="row" style="margin-bottom:12px;align-items:center">
+            <button class="btn ghost" onclick="Docs.back()">‹ 返回</button>
+            <span class="hint" style="margin:0;flex:1;text-align:center;font-size:16px;font-weight:600" id="docDetailName"></span>
+            <button class="btn ghost" style="font-size:13px;padding:7px 14px" onclick="Docs.editCurrent()">编辑</button>
+          </div>
+          <div id="docInfoArea"></div>
+        </div>
+        <div class="card wide">
+          <h2>📷 出诊排班表</h2>
+          <div class="dropzone" id="docDropSched">把排班表图片拖到这儿，或点上传</div>
+          <div class="img-grid" id="docImgSched"></div>
+        </div>
+        <div class="card wide">
+          <h2>💰 价格表</h2>
+          <div class="dropzone" id="docDropPrice">把价格表图片拖到这儿</div>
+          <div class="img-grid" id="docImgPrice"></div>
+        </div>
+        <div class="card wide">
+          <h2>🎉 活动海报</h2>
+          <div class="dropzone" id="docDropPoster">把活动海报拖到这儿</div>
+          <div class="img-grid" id="docImgPoster"></div>
+        </div>
+        <div class="card wide">
+          <h2>📦 其他图片</h2>
+          <div class="dropzone" id="docDropOther">杂七杂八的图，拖到这儿或点上传</div>
+          <div class="img-grid" id="docImgOther"></div>
+        </div>
+        <div class="card wide">
+          <h2>🤖 医生专属 AI</h2>
+          <p class="hint">已带上这位医生的资料，直接问</p>
+          <div id="docChat" class="chat"></div>
+          <div class="row" style="margin-top:10px">
+            <input type="text" id="docAiInput" placeholder="如：帮我写一条这位医生的科普文案"
+                   onkeydown="if(event.key==='Enter')Docs.askAi()" style="font-size:16px">
+            <button class="btn" onclick="Docs.askAi()">发送</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 医生编辑弹层 -->
+      <div class="overlay" id="docEditOverlay" style="display:none" onclick="if(event.target===this)Docs.closeEdit()">
+        <div class="modal">
+          <h2 id="docEditTitle">➕ 新增医生</h2>
+          <input type="text" id="docName" placeholder="医生姓名">
+          <input type="text" id="docDept" placeholder="科室/定位，如：皮肤科 · 抗衰" style="margin-top:8px">
+          <textarea id="docSpecial" placeholder="技术特色：主打项目、擅长什么" style="margin-top:8px"></textarea>
+          <textarea id="docContent" placeholder="内容方向：人设、风格、适合的内容形式" style="margin-top:8px"></textarea>
+          <textarea id="docNotes" placeholder="备注：注意事项、合作要点" style="margin-top:8px"></textarea>
+          <div class="row" style="margin-top:12px;justify-content:flex-end">
+            <button class="btn ghost" onclick="Docs.closeEdit()">取消</button>
+            <button class="btn" onclick="Docs.saveDoctor()">保存</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 图片预览弹层 -->
+      <div class="overlay" id="docImgOverlay" style="display:none" onclick="if(event.target===this)Docs.closeImg()">
+        <div class="modal" style="max-width:90%">
+          <div class="row" style="margin-bottom:10px">
+            <span id="docImgTitle" style="flex:1;font-weight:600"></span>
+            <button class="btn ghost" title="重命名" onclick="Docs.renameImg(Docs._viewImgId)">✏</button>
+            <button class="btn ghost" onclick="Docs.closeImg()">✕</button>
+          </div>
+          <div id="docImgBody" class="view-body" style="text-align:center"></div>
+        </div>
+      </div>
+      <input type="file" id="docFile" accept="image/*" multiple style="display:none">
+    </section>
+    <!-- ==== 功能：医生IP库 END ==== -->
+
+    <!-- ==== 功能：资料库 START ==== -->
+    <section class="page" id="page-refs">
+      <div class="page-title">资料库</div>
+      <div class="page-sub">PDF、Word、图片、笔记，按文件夹收好</div>
+      <div class="card wide">
+        <div class="row" style="flex-wrap:wrap;align-items:center;gap:8px">
+          <div class="breadcrumb" id="refCrumb" style="flex:1;min-width:140px"></div>
+          <button class="btn ghost" onclick="Refs.newFolder()">📁 新建文件夹</button>
+          <button class="btn ghost" onclick="Refs.pickNote()">📝 写笔记</button>
+          <button class="btn" onclick="Refs.pickFiles()">⬆ 上传文件</button>
+        </div>
+        <div class="dropzone" id="refDrop">
+          把 PDF / Word / 图片 直接拖到这儿收藏，电脑上最好使
+        </div>
+        <input type="file" id="refFile" multiple style="display:none" onchange="Refs.onFiles(this.files)">
+      </div>
+      <div class="card wide" style="padding:0 var(--pad)">
+        <div id="refList"></div>
+      </div>
+
+      <div class="card wide" id="refAiCard">
+        <h2>🤖 资料库 AI</h2>
+        <p class="hint">我能读到你的全部笔记内容和文件清单（PDF/Word 的正文读不了，只有文件名）。可以让我找资料、总结知识点、写要点。</p>
+        <div class="chat" id="refChat"></div>
+        <div class="row" style="margin-top:12px">
+          <input type="text" id="refAiInput" placeholder="问点什么，如：总结一下热玛吉的科普要点"
+                 onkeydown="if(event.key==='Enter')Refs.askAi()">
+          <button class="btn" onclick="Refs.askAi()">问</button>
+        </div>
+      </div>
+
+      <!-- 笔记编辑弹层 -->
+      <div class="overlay" id="refNoteOverlay" style="display:none" onclick="if(event.target===this)Refs.closeNote()">
+        <div class="modal">
+          <h2 id="refNoteTitleLbl">📝 写笔记</h2>
+          <input type="text" id="refNoteTitle" placeholder="标题，如：热玛吉科普要点">
+          <textarea id="refNoteContent" placeholder="内容：知识点、文案原文、爆款结构拆解……" style="margin-top:8px"></textarea>
+          <div class="row" style="margin-top:12px;justify-content:flex-end">
+            <button class="btn ghost" onclick="Refs.closeNote()">取消</button>
+            <button class="btn" onclick="Refs.saveNote()">保存</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 文件预览弹层 -->
+      <div class="overlay" id="refViewOverlay" style="display:none" onclick="if(event.target===this)Refs.closeView()">
+        <div class="modal wide">
+          <div class="row" style="justify-content:space-between;margin-bottom:10px">
+            <div class="grow" id="refViewTitle" style="font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+            <div class="row">
+              <button class="btn ghost" id="refViewDown" style="padding:8px 12px">下载</button>
+              <button class="btn ghost" id="refViewClose" style="padding:8px 12px" onclick="Refs.closeView()">关闭</button>
+            </div>
+          </div>
+          <div id="refViewBody" style="min-height:160px;max-height:72vh;overflow:auto"></div>
+        </div>
+      </div>
+    </section>
+    <!-- ==== 功能：资料库 END ==== -->
+
+    <!-- ==== 功能：AI问答 START ==== -->
+    <section class="page" id="page-ai">
+      <div class="page-title">AI 问答</div>
+      <div class="page-sub">回答会自动带上你资料库里的内容和偏好设定</div>
+      <div class="card wide" id="aiCard">
+        <div class="chat" id="aiChat"></div>
+        <div class="row" style="margin-top:14px">
+          <input type="text" id="aiInput" placeholder="问点什么，如：帮王医生想 3 条朋友圈选题"
+                 onkeydown="if(event.key==='Enter')Ai.send()">
+          <button class="btn" onclick="Ai.send()">发送</button>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn ghost" onclick="Ai.clear()">清空对话</button>
+        </div>
+      </div>
+    </section>
+    <!-- ==== 功能：AI问答 END ==== -->
+
+    <!-- ==== 功能：私密备忘 START ==== -->
+    <section class="page" id="page-memo">
+      <div class="page-title">私密备忘</div>
+      <div class="page-sub">只在这台设备上，不云同步、不进备份</div>
+      <div class="card wide" id="memoBox">
+        <div class="lock-box" id="memoLock">
+          <div class="big-ico">🔒</div>
+          <div class="row" style="justify-content:center">
+            <input type="password" id="memoPin" placeholder="输入口令" style="max-width:180px;text-align:center"
+                   onkeydown="if(event.key==='Enter')Memo.unlock()">
+            <button class="btn" onclick="Memo.unlock()">解锁</button>
+          </div>
+          <p class="hint" id="memoLockHint">第一次使用？输入 4 位以上口令即自动设置</p>
+        </div>
+        <div id="memoMain" style="display:none">
+          <!-- 列表视图 -->
+          <div id="memoListView">
+            <div class="row" style="margin-bottom:12px">
+              <span class="hint" style="margin:0;margin-right:auto">🔓 已解锁</span>
+              <button class="btn ghost" onclick="Memo.lock()">锁上</button>
+              <button class="btn" onclick="Memo.newNote()">➕ 新建</button>
+            </div>
+            <div id="memoNoteList"></div>
+          </div>
+          <!-- 编辑视图 -->
+          <div id="memoEditView" style="display:none">
+            <div class="row" style="margin-bottom:12px;align-items:center">
+              <button class="btn ghost" onclick="Memo.backToList()">‹ 返回</button>
+              <span class="hint" style="margin:0;flex:1;text-align:center" id="memoEditHint"></span>
+              <button class="btn ghost" style="font-size:13px;padding:7px 14px;color:#d9534f" onclick="Memo.delNote()">删除</button>
+            </div>
+            <input type="text" id="memoTitle" placeholder="标题（不写自动取首行）">
+            <textarea id="memoContent" placeholder="写点什么……" style="margin-top:8px"></textarea>
+            <div class="dropzone" id="memoDrop" style="margin-top:10px">把图片拖到这儿，或点下方按钮添加</div>
+            <div class="img-grid" id="memoImgs" style="margin-top:8px"></div>
+            <div class="row" style="margin-top:10px">
+              <button class="btn ghost" onclick="Memo.pickImg()">📷 添加图片</button>
+              <button class="btn" onclick="Memo.saveNote()">保存</button>
+            </div>
+            <p class="hint">自动保存 · 上次修改：<span id="memoAt"></span></p>
+          </div>
+        </div>
+      </div>
+      <input type="file" id="memoFile" accept="image/*" multiple style="display:none">
+      <div class="overlay" id="memoImgOverlay" style="display:none" onclick="if(event.target===this)Memo.closeImg()">
+        <div class="modal" style="max-width:90%">
+          <div class="row" style="margin-bottom:10px">
+            <span id="memoImgTitle" style="flex:1;font-weight:600"></span>
+            <button class="btn ghost" onclick="Memo.closeImg()">✕</button>
+          </div>
+          <div id="memoImgBody" class="view-body" style="text-align:center"></div>
+        </div>
+      </div>
+    </section>
+    <!-- ==== 功能：私密备忘 END ==== -->
+
+    <!-- ==== 功能：日志·复盘 START ==== -->
+    <section class="page" id="page-diary">
+      <div class="page-title">日志 · 复盘</div>
+      <div class="page-sub">点日历看任意天，周日让 AI 帮你总结</div>
+      <div class="card wide">
+        <div class="row" style="margin-bottom:12px;align-items:center">
+          <button class="btn ghost" onclick="Diary.prevMonth()">‹</button>
+          <span class="hint" style="flex:1;text-align:center;font-size:16px;font-weight:600" id="diaryMonth"></span>
+          <button class="btn ghost" onclick="Diary.nextMonth()">›</button>
+        </div>
+        <div class="cal-grid" id="diaryCal"></div>
+        <p class="hint">有日志的日期会高亮标记，点任意日期查看或写</p>
+      </div>
+      <div class="card wide">
+        <h2 id="diaryDateLbl">🧾 今天的日志</h2>
+        <textarea id="diaryText" placeholder="这天做了什么、有什么心得，两三行就够"></textarea>
+        <div class="row" style="margin-top:12px">
+          <button class="btn" onclick="Diary.save()">保存</button>
+          <button class="btn ghost" id="diaryDelBtn" style="display:none" onclick="Diary.delDay()">删除这天</button>
+        </div>
+      </div>
+      <div class="card wide">
+        <div id="recapBody"></div>
+        <div class="row" style="margin-top:14px;flex-wrap:wrap;gap:8px">
+          <button class="btn" onclick="Recap.makeCard()">生成本周图卡</button>
+          <button class="btn ghost" onclick="Diary.aiSummary()">🤖 AI 总结本周</button>
+        </div>
+      </div>
+      <div class="card wide" id="diaryAiCard" style="display:none">
+        <h2>🤖 本周总结</h2>
+        <div id="diaryAiResult" style="font-size:14px;line-height:1.8;white-space:pre-wrap"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn ghost" onclick="Diary.saveSummaryToRefs()">📄 存到资料库</button>
+        </div>
+      </div>
+    </section>
+    <!-- ==== 功能：日志·复盘 END ==== -->
+
+    <!-- ==== 功能：代码小知识 START ==== -->
+    <section class="page" id="page-code">
+      <div class="page-title">代码小知识</div>
+      <div class="page-sub">每天一张卡，60 天入个门</div>
+      <div class="card wide code-card" id="codeCard"></div>
+      <div class="card wide">
+        <div class="row">
+          <button class="btn ghost" onclick="Code.prev()">‹ 前一张</button>
+          <span class="hint" style="margin:0;flex:1;text-align:center" id="codeIdx"></span>
+          <button class="btn ghost" onclick="Code.next()">后一张 ›</button>
+        </div>
+        <p class="hint">每天自动翻一页，也可以手动翻</p>
+      </div>
+    </section>
+    <!-- ==== 功能：代码小知识 END ==== -->
+
+    <!-- ==== 功能：业绩看板 START ==== -->
+    <section class="page" id="page-perf">
+      <div class="page-title">业绩看板</div>
+      <div class="page-sub">皮肤 / 外科拆分录入 · 月历回看 · 链接聚合</div>
+
+      <!-- 当日数据录入（皮肤 + 外科，合计自动算） -->
+      <div class="card wide">
+        <div class="row" style="margin-bottom:10px;align-items:center">
+          <h2 style="margin:0">📊 当日数据</h2>
+          <span class="hint" style="margin:0;margin-left:8px" id="perfDate"></span>
+          <button class="btn ghost" id="perfBackToday" style="display:none;font-size:12px;padding:4px 10px;margin-left:auto" onclick="Perf.backToday()">回到今天</button>
+        </div>
+        <div class="perf-split">
+          <div class="perf-cat">
+            <div class="perf-cat-title">🧴 皮肤</div>
+            <div class="perf-grid">
+              <div><label>咨询人数</label><input type="number" id="perfSkinConsult" min="0" placeholder="0" oninput="Perf.saveDraft()"></div>
+              <div><label>上门人数</label><input type="number" id="perfSkinVisit" min="0" placeholder="0" oninput="Perf.saveDraft()"></div>
+              <div><label>成交单数</label><input type="number" id="perfSkinDeal" min="0" placeholder="0" oninput="Perf.saveDraft()"></div>
+              <div><label>成交金额（元）</label><input type="number" id="perfSkinAmount" min="0" placeholder="0" oninput="Perf.saveDraft()"></div>
+            </div>
+            <div class="perf-cat-foot" id="perfSkinFoot">成交 0 单 · 金额 ¥0 · 转化 —</div>
+          </div>
+          <div class="perf-cat">
+            <div class="perf-cat-title">🔪 外科</div>
+            <div class="perf-grid">
+              <div><label>咨询人数</label><input type="number" id="perfSurgConsult" min="0" placeholder="0" oninput="Perf.saveDraft()"></div>
+              <div><label>上门人数</label><input type="number" id="perfSurgVisit" min="0" placeholder="0" oninput="Perf.saveDraft()"></div>
+              <div><label>成交单数</label><input type="number" id="perfSurgDeal" min="0" placeholder="0" oninput="Perf.saveDraft()"></div>
+              <div><label>成交金额（元）</label><input type="number" id="perfSurgAmount" min="0" placeholder="0" oninput="Perf.saveDraft()"></div>
+            </div>
+            <div class="perf-cat-foot" id="perfSurgFoot">成交 0 单 · 金额 ¥0 · 转化 —</div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px;align-items:center;flex-wrap:wrap;gap:8px">
+          <span class="hint" style="margin:0;margin-right:auto" id="perfTotal"></span>
+          <span class="hint" id="perfRate" style="margin:0">转化率 —</span>
+          <button class="btn" onclick="Perf.saveToday()">保存</button>
+        </div>
+        <p class="hint" id="perfLegacyHint" style="display:none">⚠️ 这是旧格式记录（还没拆分皮肤/外科），重新填两类数据保存后就更新了</p>
+      </div>
+
+      <!-- 业绩月历：点某天看当天成交 / 补录 -->
+      <div class="card wide">
+        <h2>📆 业绩月历</h2>
+        <div class="cal-head">
+          <button onclick="Perf.prevMonth()">‹</button>
+          <span class="m" id="perfCalMonth"></span>
+          <button onclick="Perf.nextMonth()">›</button>
+        </div>
+        <div class="cal-grid" id="perfCal"></div>
+        <div id="perfDayDetail" style="margin-top:12px"></div>
+        <p class="hint">带圆点的日期有记录，点任意日期查看当天成交，或补录那天的数据</p>
+      </div>
+
+      <!-- 月度目标 + 趋势图 -->
+      <div class="card wide" style="text-align:center">
+        <div class="hero" id="perfMonthAmount" style="margin-bottom:4px">¥0<span class="unit">本月成交</span></div>
+        <div class="row" style="justify-content:center;margin-bottom:10px">
+          <button class="btn ghost" style="font-size:13px;padding:6px 12px" onclick="Perf.setTarget()">设月度目标</button>
+        </div>
+        <div id="perfTarget"></div>
+        <h3 style="margin:18px 0 8px;font-size:14px;color:var(--text2)">最近 14 天 · 成交金额</h3>
+        <div class="trend-chart" id="perfTrend"></div>
+        <h3 style="margin:14px 0 8px;font-size:14px;color:var(--text2)">最近 14 天 · 咨询 / 上门 / 成交</h3>
+        <div class="trend-chart" id="perfTrendCount"></div>
+      </div>
+
+      <!-- 历史记录 -->
+      <div class="card wide">
+        <h2>📋 最近记录</h2>
+        <div id="perfHistory"></div>
+      </div>
+
+      <!-- 链接聚合 -->
+      <div class="card wide">
+        <div class="row" style="margin-bottom:10px">
+          <h2 style="margin:0">🔗 快捷链接</h2>
+          <button class="btn ghost" style="font-size:13px;padding:6px 12px" onclick="Perf.addLink()">+ 添加</button>
+        </div>
+        <div id="perfLinks"></div>
+      </div>
+
+      <!-- 链接预览弹层 -->
+      <div class="overlay" id="perfLinkOverlay" style="display:none" onclick="if(event.target===this)Perf.closeLink()">
+        <div class="overlay-card" style="max-width:900px;width:92vw;height:80vh">
+          <div class="row" style="margin-bottom:10px;flex-shrink:0">
+            <span id="perfLinkTitle" style="flex:1;font-weight:600"></span>
+            <button class="btn ghost" onclick="Perf.openTab()">新标签打开 ↗</button>
+            <button class="btn ghost" onclick="Perf.closeLink()">✕</button>
+          </div>
+          <iframe id="perfLinkFrame" style="width:100%;flex:1;border:1px solid var(--line);border-radius:8px;background:#fff"></iframe>
+        </div>
+      </div>
+    </section>
+    <!-- ==== 功能：业绩看板 END ==== -->
+
+    <!-- 设置页是必备的，不要删 -->
+    <!-- ==== 功能：设置 START ==== -->
+    <section class="page" id="page-settings">
+      <div class="page-title">设置</div>
+
+      <div class="card">
+        <h2>💾 数据备份</h2>
+        <p class="hint" style="margin-top:0;margin-bottom:12px">
+          你的所有数据都存在这台手机的浏览器里，不在任何服务器上。<br>
+          换手机、清理浏览器数据前，记得先导出备份。
+        </p>
+        <div class="row">
+          <button class="btn" onclick="Store.exportFile()">导出备份</button>
+          <button class="btn ghost" onclick="document.getElementById('importFile').click()">恢复备份</button>
+        </div>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="Store.importFile(this)">
+        <p class="hint" id="backupInfo"></p>
+      </div>
+
+      <!-- ==== 双端同步卡片 START ====（用户选单设备时删掉这张卡） -->
+      <div class="card wide" id="syncCard">
+        <h2>🔄 双端同步 <span class="hint" id="syncState" style="margin:0 0 0 auto;font-size:var(--fs-meta)"></span></h2>
+        <div id="syncOff">
+          <p class="hint" style="margin-top:0">
+            开启后手机和电脑登同一个账号，记的东西自动对齐。<br>
+            <b>数据会在你的设备和云端各存一份</b>，本地那份始终在，断网照样能记。<br>
+            云端那份是明文的——只有知道你密码的人能读，但平台运维理论上能看到。<br>
+            <b>密码忘了就进不去了，没有找回功能。</b>
+          </p>
+          <div style="margin-top:14px">
+            <input type="text" id="syncUser" placeholder="用户名（3-32 个字符，只用来定位你的数据）" autocomplete="username">
+          </div>
+          <div style="margin-top:10px">
+            <input type="password" id="syncPass" placeholder="密码（至少 8 位）" autocomplete="new-password">
+          </div>
+          <div class="row" style="margin-top:14px">
+            <button class="btn" onclick="Settings.enableSync()">开启同步</button>
+            <button class="btn ghost" onclick="Store.exportFile()">先导出备份</button>
+          </div>
+          <p class="hint">建议先导出一份备份再开——万一以后忘了密码，本地这份还在。</p>
+        </div>
+        <div id="syncOn" style="display:none">
+          <p class="hint" style="margin-top:0">账号：<b id="syncWho" class="mono"></b><br>上次同步：<span id="syncTime"></span></p>
+          <div class="row" style="margin-top:14px">
+            <button class="btn" onclick="Sync.pull(true)">立即同步</button>
+            <button class="btn ghost" onclick="Settings.changePass()">改密码</button>
+            <button class="btn ghost" onclick="Sync.disable()">关闭同步</button>
+          </div>
+          <p class="hint">
+            刚在另一台设备改的东西，这边最多等一分钟才看得到（云端缓存机制），
+            等不及就点「立即同步」。
+          </p>
+        </div>
+      </div>
+      <!-- ==== 双端同步卡片 END ==== -->
+
+      <!-- 有联网功能时保留这张卡，没有就删掉 -->
+      <div class="card" id="apiCard">
+        <h2>🔑 接口配置</h2>
+        <p class="hint" style="margin-top:0;margin-bottom:12px">
+          填在这里的 key 只保存在你自己的手机上，不会上传，也<b>不会被导出到备份文件里</b>。
+        </p>
+        <div style="margin-bottom:12px">
+          <label style="font-size:16px;display:block;margin-bottom:6px">DeepSeek（AI 问答用）</label>
+          <input type="password" id="key_deepseek" placeholder="粘贴你的 key">
+          <p class="hint">在 platform.deepseek.com 注册后，「API Keys」里创建一个</p>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:16px;display:block;margin-bottom:6px">AI 的偏好设定（可选）</label>
+          <textarea id="aiPref" placeholder="告诉 AI 你的偏好，比如：我在医美机构做运营，孵化医生 IP；内容风格偏实用科普；回答尽量给能直接用的选题和文案"></textarea>
+          <p class="hint">AI 问答时会自动带上这段偏好 + 你资料库里的内容</p>
+        </div>
+        <button class="btn" onclick="Settings.saveKeys()">保存</button>
+      </div>
+
+      <div class="card">
+        <h2>⚠️ 危险操作</h2>
+        <button class="btn danger" onclick="Store.wipe()">清空所有数据</button>
+        <p class="hint">清空前请确认已经导出过备份，这个操作无法撤销。</p>
+      </div>
+
+      <div class="card">
+        <p class="hint" style="margin:0;text-align:center">
+          华子的工作台<br>
+          <span style="opacity:.6">由 不一书个人工作台生成器 生成</span>
+        </p>
+      </div>
+    </section>
+    <!-- ==== 功能：设置 END ==== -->
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   Store · 存储抽象层
+   所有数据读写都必须走这里，不要直接用 localStorage。
+
+   ── 为什么数组型数据要用 list/upsert 而不是 get/set ──
+   Store.set('money', 整个数组) 是「整本账一起覆盖」。单设备没问题，
+   一旦两台设备各自离线改过，后上传的那份会把另一份的改动无声吞掉：
+
+     手机 10 条 → 加 1 条 = 11 条，上传
+     电脑 10 条 → 加另 1 条 = 11 条，后上传 → 手机加的那条消失
+
+   所以数组型一律用 upsert / softDelete，每条带修改时间，合并时逐条比对。
+   ═══════════════════════════════════════════════════════════ */
+const Store = (() => {
+  const NS  = 'bysdash:';
+  const SEC = 'bysdash$secret:';
+  const TOMB_TTL = 30 * 864e5;   // 墓碑保留 30 天，之后清掉（那时各端早同步过了）
+
+  const driver = {
+    get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+    set(k,v){
+      try { localStorage.setItem(k, JSON.stringify(v)); return true; }
+      catch(e){
+        // 配额超了几乎总是因为存了没压缩的图片
+        UI.toast('存储空间满了，请到设置里导出备份后清理旧数据');
+        console.error(e); return false;
+      }
+    },
+    remove(k){ localStorage.removeItem(k); },
+    keys(){ return Object.keys(localStorage); }
+  };
+
+  const now = () => Date.now();
+
+  /** 按 id 逐条合并两个列表：同 id 取修改时间更新的那条 */
+  function mergeList(a, b){
+    const m = new Map();
+    for (const it of [...(a || []), ...(b || [])]) {
+      if (!it || !it.id) continue;
+      const prev = m.get(it.id);
+      if (!prev || (it._u || 0) > (prev._u || 0)) m.set(it.id, it);
+    }
+    return [...m.values()];
+  }
+
+  const S = {
+    /* ── 单值：配置、开关、计数快照这类 ── */
+    get(key, fallback = null){
+      const v = driver.get(NS + key);
+      return v === null || v === undefined ? fallback : v;
+    },
+    set(key, val){
+      const ok = driver.set(NS + key, val);
+      if (ok) this._touch();
+      return ok;
+    },
+    remove(key){ driver.remove(NS + key); this._touch(); },
+
+    /* ── 数组型：一条一条存，可合并 ── */
+    /** 读列表：过滤掉墓碑，顺手清理过期墓碑 */
+    list(key, sort){
+      const raw = this.get(key, []);
+      if (!Array.isArray(raw)) return [];
+      const cut = now() - TOMB_TTL;
+      const alive = [], keep = [];
+      for (const it of raw) {
+        if (it && it._d) { if ((it._u || 0) > cut) keep.push(it); continue; }
+        if (it) { alive.push(it); keep.push(it); }
+      }
+      if (keep.length !== raw.length) driver.set(NS + key, keep);  // 静默清理，不算一次写
+      return sort ? alive.sort(sort) : alive;
+    },
+
+    /** 增或改一条。没有 id 就生成一个；自动打修改时间 */
+    upsert(key, item){
+      const raw = this.get(key, []);
+      const it = Object.assign({}, item);
+      if (!it.id) it.id = Util.uid();
+      it._u = now();
+      delete it._d;
+      const i = raw.findIndex(x => x && x.id === it.id);
+      if (i >= 0) raw[i] = Object.assign({}, raw[i], it); else raw.push(it);
+      this.set(key, raw);
+      return it;
+    },
+
+    /** 软删除：留一个墓碑，否则另一台设备同步回来会把它复活 */
+    softDelete(key, id){
+      const raw = this.get(key, []);
+      const i = raw.findIndex(x => x && x.id === id);
+      if (i >= 0) raw[i] = { id, _d: 1, _u: now() };
+      else raw.push({ id, _d: 1, _u: now() });
+      this.set(key, raw);
+    },
+
+    /** 计数器：存成事件列表而不是一个数字。
+        数字没法正确合并（取大值会丢、相加会重复），列表天然可以。 */
+    incr(key, n = 1){
+      const raw = this.get(key, []);
+      for (let i = 0; i < n; i++) raw.push({ id: Util.uid(), _u: now() });
+      this.set(key, raw);
+      return this.count(key);
+    },
+    decr(key){
+      const alive = this.list(key);
+      if (alive.length) this.softDelete(key, alive[alive.length - 1].id);
+      return this.count(key);
+    },
+    count(key){ return this.list(key).length; },
+
+    /* ── 按天：key 自带日期，两台设备改的是不同 key，天然不冲突 ── */
+    getDaily(key, fallback = null){ return this.get(key + ':' + Util.today(), fallback); },
+    setDaily(key, val){ return this.set(key + ':' + Util.today(), val); },
+    listDaily(key, sort){ return this.list(key + ':' + Util.today(), sort); },
+    upsertDaily(key, item){ return this.upsert(key + ':' + Util.today(), item); },
+    incrDaily(key, n = 1){ return this.incr(key + ':' + Util.today(), n); },
+    decrDaily(key){ return this.decr(key + ':' + Util.today()); },
+    countDaily(key){ return this.count(key + ':' + Util.today()); },
+
+    /* ── 敏感数据：独立命名空间，不进备份 ── */
+    getSecret(key){ return driver.get(SEC + key); },
+    setSecret(key, val){ return driver.set(SEC + key, val); },
+
+
+    /* ── 旧版数据迁移 ──
+       v1.0 生成的工作台里，体重 [{date,value}]、日记 [{date,text}]、读书 [{title,...}]
+       这类结构是没有 id 的。而合并是按 id 做的，没 id 的条目会被整个跳过——
+       也就是升级后一开同步，这些历史记录会全部消失。
+       所以启动时补一次 id。
+
+       id 必须由内容算出来（不能用随机数）：手机和电脑各自迁移同一条记录时，
+       算出的 id 要一样，否则合并后会变成两条重复。 */
+    _stableId(o){
+      const s = JSON.stringify(Object.keys(o).sort().map(k => [k, o[k]]));
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+      return 'm' + (h >>> 0).toString(36);
+    },
+
+    migrate(){
+      if (this.get('_migrated')) return 0;
+      let n = 0;
+      driver.keys().filter(k => k.startsWith(NS)).forEach(k => {
+        const v = driver.get(k);
+        if (!Array.isArray(v) || !v.length) return;
+        let touched = false;
+        const fixed = v.map(it => {
+          if (!it || typeof it !== 'object') return it;
+          const o = Object.assign({}, it);
+          if (!o.id) { o.id = this._stableId(it); touched = true; }
+          if (!o._u) { o._u = 1; touched = true; }   // 标成很早，新改动永远胜出
+          return o;
+        });
+        if (touched) { driver.set(k, fixed); n++; }
+      });
+      this.set('_migrated', Date.now());
+      if (n) console.info(`[迁移] 已为 ${n} 组历史数据补齐标识，一条没少`);
+      return n;
+    },
+
+    /* ── 供云同步用 ── */
+    _touch(){
+      driver.set(NS + '_lastWrite', now());
+      if (typeof Sync !== 'undefined' && Sync.on && Sync.on()) Sync.schedule();
+    },
+    mergeList,
+    /** 把远端整包数据合并进本地。数组型逐条合并，单值取时间新的 */
+    mergeRemote(remote){
+      if (!remote || typeof remote !== 'object') return 0;
+      let changed = 0;
+      for (const [key, rv] of Object.entries(remote)) {
+        if (key.startsWith('_')) continue;
+        const lv = this.get(key, null);
+        if (Array.isArray(rv)) {
+          const merged = mergeList(Array.isArray(lv) ? lv : [], rv);
+          if (JSON.stringify(merged) !== JSON.stringify(lv)) { driver.set(NS + key, merged); changed++; }
+        } else if (lv === null || lv === undefined) {
+          driver.set(NS + key, rv); changed++;
+        }
+        // 单值且两边都有：保守起来保留本地，避免远端旧值覆盖刚改的设置
+      }
+      return changed;
+    },
+    /** 导出给云端或备份用的整包（不含 secret）。
+        forSync=true 时排除私密备忘——它只留在单台设备上，不上云。 */
+    dump(forSync){
+      const data = {};
+      driver.keys().filter(k => k.startsWith(NS)).forEach(k => {
+        const short = k.slice(NS.length);
+        if (forSync && short.startsWith('memo_')) return;
+        data[short] = driver.get(k);
+      });
+      return data;
+    },
+
+    /* ── 备份 ── */
+    exportAll(){
+      return { app:'华子的工作台', version:2, exportedAt:new Date().toISOString(), data:this.dump() };
+    },
+
+    exportFile(){
+      const blob = new Blob([JSON.stringify(this.exportAll(), null, 2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '华子备份-' + Util.today() + '.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      this.set('_lastBackup', now());
+      UI.toast('已导出，建议转发到微信文件传输助手存一份');
+      Settings.refreshBackupInfo();
+    },
+
+    importFile(input){
+      const f = input.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = e => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (!parsed.data) throw new Error('格式不对');
+          if (!confirm('恢复备份会与当前数据合并，确定吗？')) return;
+          // 用合并而不是覆盖：万一用户导入的是旧备份，现有数据不会被抹掉
+          const n = this.mergeRemote(parsed.data);
+          Object.entries(parsed.data).forEach(([k,v]) => {
+            if (!Array.isArray(v) && this.get(k, null) === null) driver.set(NS + k, v);
+          });
+          UI.toast('已合并 ' + n + ' 项，正在重新加载');
+          setTimeout(() => location.reload(), 900);
+        } catch(err){ UI.toast('文件读不了，可能不是备份文件'); }
+      };
+      r.readAsText(f);
+      input.value = '';
+    },
+
+    wipe(){
+      if (!confirm('确定清空所有数据？这个操作无法撤销。')) return;
+      if (!confirm('再确认一次：真的要清空吗？')) return;
+      driver.keys().filter(k => k.startsWith(NS)).forEach(k => driver.remove(k));
+      location.reload();
+    }
+  };
+  return S;
+})();
+
+
+/* ═══════════════════════════════════════════════════════════
+   Util · 工具
+   ═══════════════════════════════════════════════════════════ */
+const Util = {
+  today(){
+    const d = new Date();
+    return d.getFullYear() + '-' +
+           String(d.getMonth()+1).padStart(2,'0') + '-' +
+           String(d.getDate()).padStart(2,'0');
+  },
+  uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); },
+  dateOf(d){
+    return d.getFullYear() + '-' +
+           String(d.getMonth()+1).padStart(2,'0') + '-' +
+           String(d.getDate()).padStart(2,'0');
+  },
+  esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
+
+  // 图片必须压缩后再存，否则几张手机原图就撑爆 localStorage
+  compressImage(file, maxW = 800, quality = .72){
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const cv = document.createElement('canvas');
+        cv.width  = img.width  * scale;
+        cv.height = img.height * scale;
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL('image/jpeg', quality));
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  },
+
+  fmtSize(n){
+    if (n === undefined || n === null) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
+    return (n / 1073741824).toFixed(2) + ' GB';
+  },
+  fmtNum(n){
+    return (n ?? 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  },
+  fmtDate(d){
+    // "2026-08-19" → "8月19日 周三"
+    const dt = new Date(d);
+    const wd = ['日','一','二','三','四','五','六'][dt.getDay()];
+    return (dt.getMonth() + 1) + '月' + dt.getDate() + '日 周' + wd;
+  }
+};
+
+
+/* ═══════════════════════════════════════════════════════════
+   IDB · 文件本体存储（IndexedDB）
+   资料库里的 PDF/Word/图片存这儿，容量比 localStorage 大得多。
+   只存本机，不进同步、不进备份——元数据才走 Store。
+   ═══════════════════════════════════════════════════════════ */
+const IDB = {
+  DB: 'bysdash', STORE: 'files',
+  _db: null, _ok: true,
+
+  open(){
+    if (this._db) return Promise.resolve(this._db);
+    if (!this._ok) return Promise.resolve(null);
+    if (typeof indexedDB === 'undefined'){ this._ok = false; return Promise.resolve(null); }
+    return new Promise(res => {
+      const rq = indexedDB.open(this.DB, 1);
+      rq.onupgradeneeded = () => { rq.result.createObjectStore(this.STORE); };
+      rq.onsuccess = () => { this._db = rq.result; res(this._db); };
+      rq.onerror = () => { this._ok = false; res(null); };
+    });
+  },
+
+  async put(key, data){          // data: ArrayBuffer 或 dataURL 字符串
+    const db = await this.open(); if (!db) return false;
+    return new Promise(res => {
+      const tx = db.transaction(this.STORE, 'readwrite');
+      tx.objectStore(this.STORE).put(data, key);
+      tx.oncomplete = () => res(true);
+      tx.onerror = () => res(false);
+    });
+  },
+
+  async get(key){
+    const db = await this.open(); if (!db) return null;
+    return new Promise(res => {
+      const rq = db.transaction(this.STORE).objectStore(this.STORE).get(key);
+      rq.onsuccess = () => res(rq.result ?? null);
+      rq.onerror = () => res(null);
+    });
+  },
+
+  async del(key){
+    const db = await this.open(); if (!db) return;
+    return new Promise(res => {
+      const tx = db.transaction(this.STORE, 'readwrite');
+      tx.objectStore(this.STORE).delete(key);
+      tx.oncomplete = () => res();
+      tx.onerror = () => res();
+    });
+  }
+};
+
+
+/* ═══════════════════════════════════════════════════════════
+   UI · 界面工具
+   ═══════════════════════════════════════════════════════════ */
+const UI = {
+  toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('on');
+    clearTimeout(this._t);
+    this._t = setTimeout(() => t.classList.remove('on'), 2200);
+  },
+  banner(html, pageId = null){
+    const box = document.createElement('div');
+    box.className = 'banner';
+    box.innerHTML = html;
+    const target = pageId ? document.getElementById(pageId) : document.querySelector('.page.on');
+    target?.prepend(box);
+    return box;
+  }
+};
+
+
+/* ═══════════════════════════════════════════════════════════
+   App · 路由与启动
+   每加一个功能，在 routes 里加一条，侧边栏自动就有了。
+   ═══════════════════════════════════════════════════════════ */
+const App = {
+  routes: [
+    { id:'plan',     icon:'📅', name:'计划',    onShow: () => Plan.render()   },
+    { id:'docs',     icon:'👨‍⚕️', name:'医生库',  onShow: () => Docs.render()   },
+    { id:'refs',     icon:'📚', name:'资料库',  onShow: () => Refs.render()   },
+    { id:'ai',       icon:'🤖', name:'AI问答',  onShow: () => Ai.render()     },
+    { id:'memo',     icon:'📝', name:'私密备忘', onShow: () => Memo.render()  },
+    { id:'diary',    icon:'🧾', name:'日志复盘', onShow: () => Diary.render() },
+    { id:'code',     icon:'📖', name:'代码',    onShow: () => Code.render()   },
+    { id:'perf',     icon:'📊', name:'业绩',    onShow: () => Perf.render()  },
+    { id:'settings', icon:'⚙️', name:'设置',    onShow: () => Settings.render() }
+  ],
+
+  go(id){
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+    document.getElementById('page-' + id)?.classList.add('on');
+    document.querySelectorAll('#nav button').forEach(b =>
+      b.classList.toggle('on', b.dataset.id === id));
+    document.getElementById('main').scrollTop = 0;
+    Store.set('_lastPage', id);
+    this.routes.find(r => r.id === id)?.onShow?.();
+  },
+
+  init(){
+    Store.migrate();          // 旧版数据补齐 id，无感升级
+    // 渲染侧边栏
+    document.getElementById('nav').innerHTML = this.routes.map(r =>
+      `<button data-id="${r.id}" onclick="App.go('${r.id}')">
+         <span class="ico">${r.icon}</span>${r.name}
+       </button>`).join('');
+
+    // 回到上次看的那一页
+    const last = Store.get('_lastPage');
+    this.go(this.routes.some(r => r.id === last) ? last : this.routes[0].id);
+
+    this.checkBackup();
+    if (typeof Sync !== 'undefined') Sync.init();
+  },
+
+  /** 重绘当前页。同步拉到新数据后调用 */
+  refresh(){
+    const cur = document.querySelector('.page.on');
+    if (!cur) return;
+    const id = cur.id.replace('page-', '');
+    this.routes.find(r => r.id === id)?.onShow?.();
+  },
+
+  // 用户永远不会主动点导出，所以要主动提醒
+  checkBackup(){
+    const last = Store.get('_lastBackup');
+    const write = Store.get('_lastWrite');
+    if (!write) return;                                  // 还没存过东西，不用提醒
+    const days = last ? (Date.now() - last) / 864e5 : 99;
+    if (days < 7) return;
+    const b = UI.banner(
+      `<span>${last ? '已经 ' + Math.floor(days) + ' 天没备份了' : '记得备份一下，数据只在这台手机上'}</span>
+       <button onclick="App.go('settings')">去备份</button>`);
+  }
+};
+
+
+/* ═══════════════════════════════════════════════════════════
+   Settings · 设置页
+   ═══════════════════════════════════════════════════════════ */
+const Settings = {
+  keys: ['deepseek'],
+
+  render(){
+    this.refreshBackupInfo();
+    this.renderSync();
+    this.keys.forEach(k => {
+      const el = document.getElementById('key_' + k);
+      if (el) el.value = Store.getSecret(k) || '';
+    });
+    const pref = document.getElementById('aiPref');
+    if (pref) pref.value = Store.get('ai_pref', '');
+    if (!this.keys.length) document.getElementById('apiCard')?.remove();
+  },
+
+  enableSync(){
+    Sync.enable(document.getElementById('syncUser').value,
+                document.getElementById('syncPass').value);
+  },
+
+  changePass(){
+    const np = prompt('输入新密码（至少 8 位）');
+    if (np) Sync.changePass(np);
+  },
+
+  renderSync(){
+    const card = document.getElementById('syncCard');
+    if (!card || typeof Sync === 'undefined') return;
+    const on = Sync.on();
+    document.getElementById('syncOff').style.display = on ? 'none' : 'block';
+    document.getElementById('syncOn').style.display  = on ? 'block' : 'none';
+    if (on) {
+      document.getElementById('syncWho').textContent = Sync.cfg().user;
+      const t = Store.get('_syncAt');
+      document.getElementById('syncTime').textContent =
+        t ? new Date(t).toLocaleString('zh-CN') : '还没同步过';
+    }
+  },
+
+  saveKeys(){
+    this.keys.forEach(k => {
+      const el = document.getElementById('key_' + k);
+      if (el) Store.setSecret(k, el.value.trim());
+    });
+    const pref = document.getElementById('aiPref');
+    if (pref) Store.set('ai_pref', pref.value.trim());
+    UI.toast('已保存');
+  },
+
+  refreshBackupInfo(){
+    const last = Store.get('_lastBackup');
+    const el = document.getElementById('backupInfo');
+    if (el) el.textContent = last
+      ? '上次备份：' + new Date(last).toLocaleDateString('zh-CN')
+      : '还没备份过';
+  }
+};
+
+
+/* ==== 双端同步 START ====
+   用户选「只在一台设备用」时，把这整段（以及设置页里的 syncCard）删掉。
+
+   三条设计红线，破了就会烧掉免费额度或者丢数据：
+   1. 本地优先 —— 写入永远先落 localStorage，界面立刻变。云端是异步的。
+      断网、KV 抽风、额度用完，工作台照常能用，只是不同步。
+   2. 绝不轮询 —— 只在「打开时 / 切回前台 / 手动刷新」拉取。
+      每 30 秒轮一次的话，一台设备一个月就是 8 万多次函数调用。
+   3. 推送防抖 —— 改动后等 4 秒再推，把连续操作合并成一次请求。
+      勾 10 个待办应该是 1 次调用，不是 10 次。 */
+const Sync = {
+  DEBOUNCE: 4000,
+  _timer: null,
+  _busy: false,
+
+  cfg(){ return Store.get('_sync', { on:false, user:'' }); },
+  on(){ return !!this.cfg().on; },
+  pass(){ return Store.getSecret('syncPass') || ''; },
+
+  async call(action, extra = {}){
+    const c = this.cfg();
+    const r = await fetch('/api/sync', {
+      method:'POST',
+      headers:{ 'content-type':'application/json' },
+      body: JSON.stringify(Object.assign({ action, user:c.user, pass:this.pass() }, extra))
+    });
+    const j = await r.json().catch(() => ({ error:'返回格式不对' }));
+    if (!r.ok) throw new Error(j.error || ('请求失败 ' + r.status));
+    return j;
+  },
+
+  /** 开启同步：首次会把这个用户名注册下来 */
+  async enable(user, pass){
+    user = (user || '').trim().toLowerCase();
+    if (user.length < 3) return UI.toast('用户名至少 3 个字符');
+    if ((pass || '').length < 8) return UI.toast('密码至少 8 位');
+    Store.set('_sync', { on:true, user });
+    Store.setSecret('syncPass', pass);
+    try {
+      const j = await this.call('push', { data: Store.dump(true) });   // push 兼注册
+      if (j.data) Store.mergeRemote(j.data);
+      Store.set('_syncAt', Date.now());
+      UI.toast(j.created ? '同步已开启' : '已连上，数据已合并');
+      setTimeout(() => location.reload(), 900);
+    } catch(e){
+      Store.set('_sync', { on:false, user:'' });
+      Store.setSecret('syncPass', '');
+      UI.toast(e.message);
+    }
+  },
+
+  disable(){
+    if (!confirm('关闭同步？本地数据一条不会少，只是不再和云端对齐。')) return;
+    Store.set('_sync', { on:false, user:'' });
+    Store.setSecret('syncPass', '');
+    UI.toast('已关闭同步');
+    Settings.render();
+  },
+
+  async changePass(np){
+    if ((np || '').length < 8) return UI.toast('新密码至少 8 位');
+    try {
+      await this.call('chpass', { newPass: np });
+      Store.setSecret('syncPass', np);
+      UI.toast('密码已改');
+    } catch(e){ UI.toast(e.message); }
+  },
+
+  /** 拉取并合并。失败一律静默降级——本地数据才是主的 */
+  async pull(loud){
+    if (!this.on() || this._busy) return;
+    this._busy = true;
+    this.status('同步中');
+    try {
+      const j = await this.call('pull');
+      const n = Store.mergeRemote(j.data || {});
+      Store.set('_syncAt', Date.now());
+      this.status('已同步');
+      if (n) { if (loud) UI.toast('拉到 ' + n + ' 处更新'); App.refresh(); }
+      else if (loud) UI.toast('已是最新');
+    } catch(e){
+      this.status('未同步');
+      if (loud) UI.toast(e.message.includes('NO_ACCOUNT') ? '云端还没有数据' : e.message);
+    } finally { this._busy = false; }
+  },
+
+  /** 改动后延迟推送，把连续操作合并成一次 */
+  schedule(){
+    if (!this.on()) return;
+    clearTimeout(this._timer);
+    this._timer = setTimeout(() => this.push(), this.DEBOUNCE);
+  },
+
+  async push(){
+    if (!this.on() || this._busy) return;
+    this._busy = true;
+    this.status('同步中');
+    try {
+      const j = await this.call('push', { data: Store.dump(true) });
+      if (j.data) Store.mergeRemote(j.data);
+      Store.set('_syncAt', Date.now());
+      this.status('已同步');
+    } catch(e){
+      this.status('未同步');
+      console.warn('同步失败，本地数据不受影响：', e.message);
+    } finally { this._busy = false; }
+  },
+
+  status(t){
+    const el = document.getElementById('syncState');
+    if (el) el.textContent = t;
+  },
+
+  init(){
+    if (!this.on()) return;
+    this.pull();                                   // 打开时拉一次
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) this.pull();           // 切回前台再拉一次。到此为止，不轮询
+    });
+    window.addEventListener('online', () => this.push());
+  }
+};
+/* ==== 双端同步 END ==== */
+
+
+</script>
+
+<!-- 功能模块（拆分自 index.html，部署时一起上传） -->
+<script src="features/计划.js"></script>
+<script src="features/医生库.js"></script>
+<script src="features/资料库.js"></script>
+<script src="features/AI问答.js"></script>
+<script src="features/私密备忘.js"></script>
+<script src="features/日志复盘.js"></script>
+<script src="features/代码小知识.js"></script>
+<script src="features/业绩看板.js"></script>
+
+<script>
+App.init();
+</script>
+</body>
+</html>

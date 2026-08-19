@@ -1,0 +1,19 @@
+{
+  "name": "华子的工作台",
+  "short_name": "华子",
+  "description": "华子的个人工作台：计划、医生IP库、资料库、AI问答、日志复盘",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f1ebe3",
+  "theme_color": "#f7f2ea",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
