@@ -149,6 +149,20 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
 .item.done .box{background:var(--accent)}
 .item.done .grow{text-decoration:line-through;color:var(--text-dim)}
 
+/* 置顶（优先级）：📌 点一下排到最前 */
+.pin{
+  color:var(--text-dim);font-size:15px;background:none;border:none;
+  padding:0 4px;flex-shrink:0;opacity:.4;cursor:pointer;
+  transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);
+}
+.pin:active{opacity:.75}
+.pin.on{opacity:1;transform:scale(1.08)}
+.item.pinned{
+  background:rgba(169,113,75,.07);border-radius:12px;
+  margin:0 -8px;padding-left:8px;padding-right:8px;
+}
+.item.pinned .grow{font-weight:500}
+
 /* ==== 提示条 ==== */
 .banner{
   background:var(--accent);color:#fff;padding:11px 14px;
@@ -501,10 +515,11 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
       <div class="card">
         <h2 id="planListTitle">今天的事</h2>
         <div id="planList"></div>
+        <p class="hint">点 📌 把重要的事置顶排最前；完成的会自动沉到最下面</p>
       </div>
       <div class="card">
         <h2>🔁 每日例行</h2>
-        <p class="hint" style="margin-top:0">固定要做的事设一次，每天自动出现，不用重复添加；勾选状态每天独立重新计</p>
+        <p class="hint" style="margin-top:0">固定要做的事设一次，每天自动出现，不用重复添加；勾选状态每天独立重新计；点 📌 置顶，每天清单里都排最前</p>
         <div id="planRoutineList"></div>
         <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)">
           <div class="row">

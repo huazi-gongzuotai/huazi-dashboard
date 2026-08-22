@@ -4,8 +4,10 @@
    过了当天还没做完的，进"过期未完成"提醒区，不会无声消失。
    每日例行：设一次，从当天起自动出现在每天的清单里，勾选状态每天独立；
    可以只在周几重复、可以暂停、可以跳过某一天。
-   数据：plan_events = [{id, date:'YYYY-MM-DD', time:'HH:MM'|'', text, done, routineId?, _u}]
-        plan_routines = [{id, text, time:'', days:[0-6], active:true, skip:['YYYY-MM-DD'], _u}] */
+   优先级：📌 置顶。事项和例行都可置顶，置顶的排最前；
+   例行置顶后每天生成的清单事项也置顶；完成的事项沉到最下面。
+   数据：plan_events = [{id, date:'YYYY-MM-DD', time:'HH:MM'|'', text, done, top?, routineId?, _u}]
+        plan_routines = [{id, text, time:'', days:[0-6], active:true, skip:['YYYY-MM-DD'], top?, _u}] */
 const Plan = {
   KEY: 'plan_events',
   RKEY: 'plan_routines',
@@ -17,14 +19,27 @@ const Plan = {
     return Store.list(this.KEY, (a, b) =>
       (a.date + (a.time || '99')) > (b.date + (b.time || '99')) ? 1 : -1);
   },
-  of(date){ return this.all().filter(e => e.date === date); },
+  /* 某天的清单：未完成在前 → 置顶最前 → 按时间（完成了就沉底，置顶也随之让位） */
+  of(date){
+    return this.all().filter(e => e.date === date).sort((a, b) => {
+      const da = a.done ? 1 : 0, db = b.done ? 1 : 0;
+      if (da !== db) return da - db;
+      const pa = a.top ? 0 : 1, pb = b.top ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return (a.time || '99') > (b.time || '99') ? 1 : -1;
+    });
+  },
   overdue(){
     const t = Util.today();
     return this.all().filter(e => !e.done && e.date < t);
   },
+  /* 例行列表：置顶最前 → 按时间 */
   routines(){
-    return Store.list(this.RKEY, (a, b) =>
-      (a.time || '99') > (b.time || '99') ? 1 : -1);
+    return Store.list(this.RKEY, (a, b) => {
+      const pa = a.top ? 0 : 1, pb = b.top ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return (a.time || '99') > (b.time || '99') ? 1 : -1;
+    });
   },
 
   render(){
@@ -57,7 +72,7 @@ const Plan = {
       if ((r.days || [0,1,2,3,4,5,6]).indexOf(new Date(ds + 'T00:00:00').getDay()) < 0) return;
       if ((r.skip || []).indexOf(ds) >= 0) return;
       if (exist[r.id + '|' + ds]) return;
-      Store.upsert(this.KEY, { id: Util.uid(), date: ds, time: r.time || '', text: r.text, done: false, routineId: r.id });
+      Store.upsert(this.KEY, { id: Util.uid(), date: ds, time: r.time || '', text: r.text, done: false, routineId: r.id, top: !!r.top });
     });
   },
 
@@ -116,11 +131,12 @@ const Plan = {
       return;
     }
     box.innerHTML = list.map(e => `
-      <div class="item ${e.done ? 'done' : ''}">
+      <div class="item ${e.done ? 'done' : ''} ${e.top ? 'pinned' : ''}">
         <button class="box" onclick="Plan.toggle('${e.id}')">${e.done ? '✓' : ''}</button>
         ${e.routineId ? '<span class="time-tag" style="color:var(--text2);background:rgba(140,130,120,.14)">🔁</span>' : ''}
         ${e.time ? `<span class="time-tag ${(!e.done && e.date < Util.today()) ? 'overdue' : ''}">${e.time}</span>` : ''}
         <span class="grow">${Util.esc(e.text)}</span>
+        <button class="pin ${e.top ? 'on' : ''}" title="${e.top ? '取消置顶' : '置顶'}" onclick="Plan.pin('${e.id}')">📌</button>
         <button class="del" onclick="Plan.del('${e.id}')">✕</button>
       </div>`).join('');
   },
@@ -155,8 +171,9 @@ const Plan = {
         <div class="head">
           <span class="grow">
             <div class="rt">${r.active ? '' : '⏸ '}${Util.esc(r.text)}</div>
-            <div class="routine-days">${r.time ? r.time + ' · ' : ''}${days}${r.active ? '' : ' · 已暂停'}</div>
+            <div class="routine-days">${r.top ? '📌 · ' : ''}${r.time ? r.time + ' · ' : ''}${days}${r.active ? '' : ' · 已暂停'}</div>
           </span>
+          <button class="pin ${r.top ? 'on' : ''}" title="${r.top ? '取消置顶' : '置顶（每天清单里都排最前）'}" onclick="Plan.pinRoutine('${r.id}')">📌</button>
           <button class="btn ghost" style="font-size:13px;padding:6px 12px" onclick="Plan.toggleRoutine('${r.id}')">${r.active ? '暂停' : '启用'}</button>
           <button class="del" onclick="Plan.delRoutine('${r.id}')">✕</button>
         </div>
@@ -239,6 +256,47 @@ const Plan = {
       if (e.routineId === id && !e.done && e.date >= Util.today()) Store.softDelete(this.KEY, e.id);
     });
     this.render();
+  },
+
+  /* 置顶一条事项。来自例行的事项会问：只置顶今天，还是这条例行每天都置顶 */
+  pin(id){
+    const e = this.all().find(x => x.id === id);
+    if (!e) return;
+    const top = !e.top;
+    if (e.routineId){
+      const everyDay = confirm('这条来自每日例行。\n\n「确定」= 这条例行以后每天都置顶\n「取消」= 只置顶今天');
+      if (everyDay){
+        const r = this.routines().find(x => x.id === e.routineId);
+        if (r){
+          Store.upsert(this.RKEY, Object.assign({}, r, { top }));
+          // 今天起还没完成的例行事件同步置顶状态；已完成的保留作记录
+          this.all().forEach(ev => {
+            if (ev.routineId === e.routineId && !ev.done && ev.date >= Util.today())
+              Store.upsert(this.KEY, Object.assign({}, ev, { top }));
+          });
+        }
+        this.render();
+        UI.toast(top ? '这条例行每天都会置顶' : '已取消置顶');
+        return;
+      }
+    }
+    Store.upsert(this.KEY, Object.assign({}, e, { top }));
+    this.render();
+    UI.toast(top ? '已置顶' : '已取消置顶');
+  },
+
+  /* 置顶一条例行：卡片排最前，每天生成的清单事项也置顶 */
+  pinRoutine(id){
+    const r = this.routines().find(x => x.id === id);
+    if (!r) return;
+    const top = !r.top;
+    Store.upsert(this.RKEY, Object.assign({}, r, { top }));
+    this.all().forEach(ev => {
+      if (ev.routineId === id && !ev.done && ev.date >= Util.today())
+        Store.upsert(this.KEY, Object.assign({}, ev, { top }));
+    });
+    this.render();
+    UI.toast(top ? '这条例行已置顶' : '已取消置顶');
   },
 
   toggle(id){
