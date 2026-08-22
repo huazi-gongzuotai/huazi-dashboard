@@ -1,16 +1,19 @@
 /* ==== 功能：日历·计划 START ====
-   月历视图 + 每日事项（可带时间段）+ 每日例行（长期计划）。
+   月历视图 + 每日事项（可带时间段）+ 每日例行（长期计划）+ 思考的事（备忘池）。
    事项存在任何一天，到期那天自动出现在"今天"；
    过了当天还没做完的，进"过期未完成"提醒区，不会无声消失。
    每日例行：设一次，从当天起自动出现在每天的清单里，勾选状态每天独立；
    可以只在周几重复、可以暂停、可以跳过某一天。
-   优先级：📌 置顶。事项和例行都可置顶，置顶的排最前；
+   思考的事：临时想到但不急着做的事，无日期无时间；想好了点「→待办」转成今天的待办。
+   优先级：📌 置顶。事项、例行、思考都可置顶，置顶的排最前；
    例行置顶后每天生成的清单事项也置顶；完成的事项沉到最下面。
    数据：plan_events = [{id, date:'YYYY-MM-DD', time:'HH:MM'|'', text, done, top?, routineId?, _u}]
-        plan_routines = [{id, text, time:'', days:[0-6], active:true, skip:['YYYY-MM-DD'], top?, _u}] */
+        plan_routines = [{id, text, time:'', days:[0-6], active:true, skip:['YYYY-MM-DD'], top?, _u}]
+        plan_thoughts = [{id, text, ts, done?, top?, _u}] */
 const Plan = {
   KEY: 'plan_events',
   RKEY: 'plan_routines',
+  TKEY: 'plan_thoughts',
   view: null,        // 当前查看的日期 'YYYY-MM-DD'
   calY: 0, calM: 0,  // 月历显示的年月
   _days: [0,1,2,3,4,5,6],  // 新建例行时勾选的星期（0=周日）
@@ -42,6 +45,17 @@ const Plan = {
     });
   },
 
+  /* 思考的事列表：未完成在前 → 置顶最前 → 新写的在上 */
+  thoughts(){
+    return Store.list(this.TKEY, (a, b) => {
+      const da = a.done ? 1 : 0, db = b.done ? 1 : 0;
+      if (da !== db) return da - db;
+      const pa = a.top ? 0 : 1, pb = b.top ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return (b.ts || 0) - (a.ts || 0);
+    });
+  },
+
   render(){
     if (!this.view) this.view = Util.today();
     if (!this.calY){
@@ -53,6 +67,7 @@ const Plan = {
     this.renderCal();
     this.renderList();
     this.renderOverdue();
+    this.renderThoughts();
     this.renderRoutines();
     this.renderDayChips();
     // 添加表单默认值
@@ -187,6 +202,24 @@ const Plan = {
       `<span class="day-chip ${this._days.indexOf(i) >= 0 ? 'on' : ''}" onclick="Plan.toggleDay(${i})">${w}</span>`).join('');
   },
 
+  renderThoughts(){
+    const list = this.thoughts();
+    const box = document.getElementById('planThoughtList');
+    if (!list.length){
+      box.innerHTML = '<div class="empty">想到什么先记下来，想好了转成待办</div>';
+      return;
+    }
+    box.innerHTML = list.map(t => `
+      <div class="item ${t.done ? 'done' : ''} ${t.top ? 'pinned' : ''}">
+        <button class="box" onclick="Plan.toggleThought('${t.id}')">${t.done ? '✓' : ''}</button>
+        <span class="time-tag" style="color:var(--text2);background:rgba(140,130,120,.14)">💡</span>
+        <span class="grow">${Util.esc(t.text)}</span>
+        <button class="btn ghost" style="font-size:12px;padding:4px 10px" onclick="Plan.promoteThought('${t.id}')" title="转为今天的待办">→待办</button>
+        <button class="pin ${t.top ? 'on' : ''}" title="${t.top ? '取消置顶' : '置顶'}" onclick="Plan.pinThought('${t.id}')">📌</button>
+        <button class="del" onclick="Plan.delThought('${t.id}')">✕</button>
+      </div>`).join('');
+  },
+
   pick(ds){
     this.view = ds;
     const d = new Date(ds + 'T00:00:00');
@@ -297,6 +330,48 @@ const Plan = {
     });
     this.render();
     UI.toast(top ? '这条例行已置顶' : '已取消置顶');
+  },
+
+  /* ==== 思考的事 ==== */
+  addThought(){
+    const text = document.getElementById('thoughtText').value.trim();
+    if (!text) return UI.toast('先写想到的事');
+    Store.upsert(this.TKEY, { id: Util.uid(), text, ts: Date.now(), done: false });
+    document.getElementById('thoughtText').value = '';
+    this.renderThoughts();
+    UI.toast('记下了');
+  },
+
+  pinThought(id){
+    const t = this.thoughts().find(x => x.id === id);
+    if (!t) return;
+    const top = !t.top;
+    Store.upsert(this.TKEY, Object.assign({}, t, { top }));
+    this.renderThoughts();
+    UI.toast(top ? '已置顶' : '已取消置顶');
+  },
+
+  toggleThought(id){
+    const t = this.thoughts().find(x => x.id === id);
+    if (!t) return;
+    Store.upsert(this.TKEY, Object.assign({}, t, { done: !t.done }));
+    this.renderThoughts();
+  },
+
+  delThought(id){
+    if (!confirm('删掉这条思考？')) return;
+    Store.softDelete(this.TKEY, id);
+    this.renderThoughts();
+  },
+
+  /* 把思考转为今天的待办，原思考自动删除 */
+  promoteThought(id){
+    const t = this.thoughts().find(x => x.id === id);
+    if (!t) return;
+    Store.upsert(this.KEY, { id: Util.uid(), date: Util.today(), time: '', text: t.text, done: false, top: !!t.top });
+    Store.softDelete(this.TKEY, id);
+    this.render();
+    UI.toast('已转为今天的待办');
   },
 
   toggle(id){

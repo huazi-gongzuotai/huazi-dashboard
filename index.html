@@ -518,6 +518,17 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
         <p class="hint">点 📌 把重要的事置顶排最前；完成的会自动沉到最下面</p>
       </div>
       <div class="card">
+        <h2>💡 思考的事</h2>
+        <p class="hint" style="margin-top:0">临时想到但不急着做的事先记这里，想好了点「→待办」转成今天的待办；点 📌 置顶</p>
+        <div id="planThoughtList"></div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)">
+          <div class="row">
+            <input type="text" id="thoughtText" placeholder="突然想到的事，如：要不要做个老客回馈活动">
+            <button class="btn" onclick="Plan.addThought()">记下</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
         <h2>🔁 每日例行</h2>
         <p class="hint" style="margin-top:0">固定要做的事设一次，每天自动出现，不用重复添加；勾选状态每天独立重新计；点 📌 置顶，每天清单里都排最前</p>
         <div id="planRoutineList"></div>
