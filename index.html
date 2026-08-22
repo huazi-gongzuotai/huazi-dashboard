@@ -211,20 +211,6 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
 /* ════════ 桌面：卡片并排 ════════
    标题、副标题、提示条永远占满整行；卡片默认半宽。
    需要占满的重要卡片（英雄卡、长列表）加 class="card wide"。 */
-@media (min-width:1100px){
-  :root{--fs-hero:56px;--fs-title:30px;--pad:30px;--gap:20px}
-  .side{width:240px}
-  .main{padding:36px 44px 52px}
-  .page.on{
-    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:var(--gap);align-content:start;
-  }
-  .page.on > .page-title,
-  .page.on > .page-sub,
-  .page.on > .banner,
-  .page.on > .card.wide{grid-column:1 / -1}
-}
-
 /* 超宽屏限制内容宽度并居中 —— 一行文字超过 40 个汉字就难读了 */
 @media (min-width:1700px){
   .main > .page.on{max-width:1400px;margin:0 auto}
@@ -441,6 +427,40 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
 .link-card .act button{font-size:12px;padding:4px 8px;border:1px solid var(--line);background:var(--card);border-radius:6px;cursor:pointer}
 .overlay-card{background:var(--card);border-radius:calc(var(--radius) - 4px);padding:14px;display:flex;flex-direction:column;max-height:90vh;box-shadow:0 8px 32px rgba(0,0,0,.15)}
 
+/* ════════ 桌面：卡片并排 ════════
+   标题、副标题、提示条永远占满整行；卡片默认半宽。
+   需要占满的重要卡片（英雄卡、长列表）加 class="card wide"。
+   放在样式表最后，确保能覆盖前面的默认规则。 */
+@media (min-width:1100px){
+  :root{--fs-hero:56px;--fs-title:30px;--pad:30px;--gap:20px}
+  .side{width:240px}
+  .main{padding:36px 44px 52px}
+  .page.on{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:var(--gap);align-content:start;
+  }
+  .page.on > .page-title,
+  .page.on > .page-sub,
+  .page.on > .banner,
+  .page.on > .card.wide{grid-column:1 / -1}
+  /* 鼠标悬停反馈 */
+  .nav button:not(.on):hover{background:rgba(45,38,32,.06)}
+  .btn:hover{filter:brightness(1.05)}
+  .item .box:hover{border-color:var(--sidebar-active)}
+  .card{transition:box-shadow var(--dur) var(--ease)}
+  .card:hover{box-shadow:0 4px 18px rgba(120,100,80,.12)}
+  /* 业绩：当日数据里的皮肤/外科两栏横向排布 */
+  .perf-split{flex-direction:row;align-items:stretch}
+  .perf-cat{flex:1;min-width:0}
+  /* 趋势图在半宽卡片里稍微加高一点 */
+  .trend-chart{height:130px}
+}
+
+/* 超宽屏限制内容宽度并居中 */
+@media (min-width:1700px){
+  .main > .page.on{max-width:1400px;margin:0 auto}
+}
+
 </style>
 </head>
 <body>
@@ -465,7 +485,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
     <section class="page" id="page-plan">
       <div class="page-title" id="planTitle">今天</div>
       <div class="page-sub" id="planSub"></div>
-      <div class="card wide">
+      <div class="card">
         <div class="cal-head">
           <button onclick="Plan.prevMonth()">‹</button>
           <span class="m" id="calMonth"></span>
@@ -478,11 +498,11 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
         <h2>⚠️ 过期未完成</h2>
         <div id="planOverdue"></div>
       </div>
-      <div class="card wide">
+      <div class="card">
         <h2 id="planListTitle">今天的事</h2>
         <div id="planList"></div>
       </div>
-      <div class="card wide">
+      <div class="card">
         <h2>🔁 每日例行</h2>
         <p class="hint" style="margin-top:0">固定要做的事设一次，每天自动出现，不用重复添加；勾选状态每天独立重新计</p>
         <div id="planRoutineList"></div>
@@ -498,7 +518,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
           <p class="hint">时间可不填；点星期几可以只在选中的日子重复</p>
         </div>
       </div>
-      <div class="card wide">
+      <div class="card">
         <h2 id="planAddTitle">加一件事</h2>
         <div class="row">
           <input type="text" id="planText" placeholder="要做什么，如：写王医生口播脚本">
@@ -743,7 +763,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
     <section class="page" id="page-diary">
       <div class="page-title">日志 · 复盘</div>
       <div class="page-sub">点日历看任意天，周日让 AI 帮你总结</div>
-      <div class="card wide">
+      <div class="card">
         <div class="row" style="margin-bottom:12px;align-items:center">
           <button class="btn ghost" onclick="Diary.prevMonth()">‹</button>
           <span class="hint" style="flex:1;text-align:center;font-size:16px;font-weight:600" id="diaryMonth"></span>
@@ -752,7 +772,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
         <div class="cal-grid" id="diaryCal"></div>
         <p class="hint">有日志的日期会高亮标记，点任意日期查看或写</p>
       </div>
-      <div class="card wide">
+      <div class="card">
         <h2 id="diaryDateLbl">🧾 今天的日志</h2>
         <textarea id="diaryText" placeholder="这天做了什么、有什么心得，两三行就够"></textarea>
         <div class="row" style="margin-top:12px">
@@ -836,7 +856,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
       </div>
 
       <!-- 业绩月历：点某天看当天成交 / 补录 -->
-      <div class="card wide">
+      <div class="card">
         <h2>📆 业绩月历</h2>
         <div class="cal-head">
           <button onclick="Perf.prevMonth()">‹</button>
@@ -849,7 +869,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
       </div>
 
       <!-- 月度目标 + 趋势图 -->
-      <div class="card wide" style="text-align:center">
+      <div class="card" style="text-align:center">
         <div class="hero" id="perfMonthAmount" style="margin-bottom:4px">¥0<span class="unit">本月成交</span></div>
         <div class="row" style="justify-content:center;margin-bottom:10px">
           <button class="btn ghost" style="font-size:13px;padding:6px 12px" onclick="Perf.setTarget()">设月度目标</button>
@@ -862,13 +882,13 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
       </div>
 
       <!-- 历史记录 -->
-      <div class="card wide">
+      <div class="card">
         <h2>📋 最近记录</h2>
         <div id="perfHistory"></div>
       </div>
 
       <!-- 链接聚合 -->
-      <div class="card wide">
+      <div class="card">
         <div class="row" style="margin-bottom:10px">
           <h2 style="margin:0">🔗 快捷链接</h2>
           <button class="btn ghost" style="font-size:13px;padding:6px 12px" onclick="Perf.addLink()">+ 添加</button>
