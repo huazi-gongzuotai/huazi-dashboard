@@ -1,12 +1,17 @@
 /* ==== 功能：日历·计划 START ====
-   月历视图 + 每日事项（可带时间段）。
+   月历视图 + 每日事项（可带时间段）+ 每日例行（长期计划）。
    事项存在任何一天，到期那天自动出现在"今天"；
    过了当天还没做完的，进"过期未完成"提醒区，不会无声消失。
-   数据：plan_events = [{id, date:'YYYY-MM-DD', time:'HH:MM'|'', text, done, _u}] */
+   每日例行：设一次，从当天起自动出现在每天的清单里，勾选状态每天独立；
+   可以只在周几重复、可以暂停、可以跳过某一天。
+   数据：plan_events = [{id, date:'YYYY-MM-DD', time:'HH:MM'|'', text, done, routineId?, _u}]
+        plan_routines = [{id, text, time:'', days:[0-6], active:true, skip:['YYYY-MM-DD'], _u}] */
 const Plan = {
   KEY: 'plan_events',
+  RKEY: 'plan_routines',
   view: null,        // 当前查看的日期 'YYYY-MM-DD'
   calY: 0, calM: 0,  // 月历显示的年月
+  _days: [0,1,2,3,4,5,6],  // 新建例行时勾选的星期（0=周日）
 
   all(){
     return Store.list(this.KEY, (a, b) =>
@@ -17,6 +22,10 @@ const Plan = {
     const t = Util.today();
     return this.all().filter(e => !e.done && e.date < t);
   },
+  routines(){
+    return Store.list(this.RKEY, (a, b) =>
+      (a.time || '99') > (b.time || '99') ? 1 : -1);
+  },
 
   render(){
     if (!this.view) this.view = Util.today();
@@ -24,13 +33,32 @@ const Plan = {
       const d = new Date(this.view + 'T00:00:00');
       this.calY = d.getFullYear(); this.calM = d.getMonth();
     }
+    this.materialize(this.view);
     this.renderTitle();
     this.renderCal();
     this.renderList();
     this.renderOverdue();
+    this.renderRoutines();
+    this.renderDayChips();
     // 添加表单默认值
     document.getElementById('planDate').value = this.view;
     document.getElementById('planTime').value = '';
+  },
+
+  /* 把每日例行"落实"成某一天的具体事项（懒生成）：
+     只对今天及以后生效，过去的日子不生成（避免堆积过期提醒）；
+     跳过的日期、暂停的例行不生成；同一天同一条只生成一次。 */
+  materialize(ds){
+    if (ds < Util.today()) return;
+    const exist = {};
+    this.all().forEach(e => { if (e.routineId) exist[e.routineId + '|' + e.date] = 1; });
+    this.routines().forEach(r => {
+      if (!r.active) return;
+      if ((r.days || [0,1,2,3,4,5,6]).indexOf(new Date(ds + 'T00:00:00').getDay()) < 0) return;
+      if ((r.skip || []).indexOf(ds) >= 0) return;
+      if (exist[r.id + '|' + ds]) return;
+      Store.upsert(this.KEY, { id: Util.uid(), date: ds, time: r.time || '', text: r.text, done: false, routineId: r.id });
+    });
   },
 
   renderTitle(){
@@ -90,6 +118,7 @@ const Plan = {
     box.innerHTML = list.map(e => `
       <div class="item ${e.done ? 'done' : ''}">
         <button class="box" onclick="Plan.toggle('${e.id}')">${e.done ? '✓' : ''}</button>
+        ${e.routineId ? '<span class="time-tag" style="color:var(--text2);background:rgba(140,130,120,.14)">🔁</span>' : ''}
         ${e.time ? `<span class="time-tag ${(!e.done && e.date < Util.today()) ? 'overdue' : ''}">${e.time}</span>` : ''}
         <span class="grow">${Util.esc(e.text)}</span>
         <button class="del" onclick="Plan.del('${e.id}')">✕</button>
@@ -108,6 +137,37 @@ const Plan = {
         <span class="grow">${Util.esc(e.text)}</span>
         <button class="del" onclick="Plan.del('${e.id}')">✕</button>
       </div>`).join('');
+  },
+
+  renderRoutines(){
+    const box = document.getElementById('planRoutineList');
+    const rs = this.routines();
+    if (!rs.length){
+      box.innerHTML = '<div class="empty">还没有每日例行，在下面加一条</div>';
+      return;
+    }
+    const wd = '日一二三四五六';
+    box.innerHTML = rs.map(r => {
+      const days = (r.days || []).length === 7 ? '每天'
+        : (r.days || []).slice().sort((a,b) => a-b).map(d => '周' + wd[d]).join('、');
+      return `
+      <div class="routine-item" ${r.active ? '' : 'style="opacity:.55"'}>
+        <div class="head">
+          <span class="grow">
+            <div class="rt">${r.active ? '' : '⏸ '}${Util.esc(r.text)}</div>
+            <div class="routine-days">${r.time ? r.time + ' · ' : ''}${days}${r.active ? '' : ' · 已暂停'}</div>
+          </span>
+          <button class="btn ghost" style="font-size:13px;padding:6px 12px" onclick="Plan.toggleRoutine('${r.id}')">${r.active ? '暂停' : '启用'}</button>
+          <button class="del" onclick="Plan.delRoutine('${r.id}')">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  },
+
+  renderDayChips(){
+    const wd = ['日','一','二','三','四','五','六'];
+    document.getElementById('routineDays').innerHTML = wd.map((w, i) =>
+      `<span class="day-chip ${this._days.indexOf(i) >= 0 ? 'on' : ''}" onclick="Plan.toggleDay(${i})">${w}</span>`).join('');
   },
 
   pick(ds){
@@ -132,6 +192,55 @@ const Plan = {
     this.render();
   },
 
+  addRoutine(){
+    const text = document.getElementById('routineText').value.trim();
+    if (!text) return UI.toast('先写每天要做什么');
+    const time = document.getElementById('routineTime').value || '';
+    Store.upsert(this.RKEY, { id: Util.uid(), text, time, days: this._days.slice(), active: true });
+    document.getElementById('routineText').value = '';
+    document.getElementById('routineTime').value = '';
+    this._days = [0,1,2,3,4,5,6];
+    this.materialize(this.view);
+    this.render();
+    UI.toast('已加入每日例行');
+  },
+
+  toggleDay(i){
+    const p = this._days.indexOf(i);
+    if (p >= 0){
+      if (this._days.length === 1) return UI.toast('至少要保留一天');
+      this._days.splice(p, 1);
+    } else {
+      this._days.push(i);
+    }
+    this.renderDayChips();
+  },
+
+  toggleRoutine(id){
+    const r = this.routines().find(x => x.id === id);
+    if (!r) return;
+    const active = !r.active;
+    Store.upsert(this.RKEY, Object.assign({}, r, { active }));
+    if (!active){
+      // 暂停：清掉今天起还没做的例行事件，避免残影；已完成的保留作记录
+      this.all().forEach(e => {
+        if (e.routineId === id && !e.done && e.date >= Util.today()) Store.softDelete(this.KEY, e.id);
+      });
+    } else {
+      this.materialize(this.view);
+    }
+    this.render();
+  },
+
+  delRoutine(id){
+    if (!confirm('删除这条每日例行？以后每天都不再出现（已完成的记录会保留）')) return;
+    Store.softDelete(this.RKEY, id);
+    this.all().forEach(e => {
+      if (e.routineId === id && !e.done && e.date >= Util.today()) Store.softDelete(this.KEY, e.id);
+    });
+    this.render();
+  },
+
   toggle(id){
     const e = this.all().find(x => x.id === id);
     if (!e) return;
@@ -140,8 +249,18 @@ const Plan = {
   },
 
   del(id){
-    if (!confirm('删掉这件事？')) return;
-    Store.softDelete(this.KEY, id);
+    const e = this.all().find(x => x.id === id);
+    if (!e) return;
+    if (e.routineId){
+      // 例行生成的事项：只删这一天，明天照常出现；想彻底删去「每日例行」卡片删
+      if (!confirm('这条来自每日例行，只删这一天，明天还会照常出现。继续？')) return;
+      const r = this.routines().find(x => x.id === e.routineId);
+      if (r) Store.upsert(this.RKEY, Object.assign({}, r, { skip: (r.skip || []).concat([e.date]) }));
+      Store.softDelete(this.KEY, id);
+    } else {
+      if (!confirm('删掉这件事？')) return;
+      Store.softDelete(this.KEY, id);
+    }
     this.render();
   }
 };

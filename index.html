@@ -262,6 +262,19 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
   padding:2px 8px;border-radius:6px;flex-shrink:0;font-variant-numeric:tabular-nums;
 }
 .time-tag.overdue{color:#d9534f;background:rgba(217,83,79,.1)}
+
+/* 每日例行：星期选择芯片 + 例行事项行 */
+.day-chip{
+  display:inline-block;padding:5px 10px;border:1px solid var(--line);border-radius:14px;
+  font-size:13px;color:var(--text2);cursor:pointer;user-select:none;line-height:1;
+}
+.day-chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.routine-days{font-size:12px;color:var(--text2);margin-top:2px}
+.routine-item{padding:10px 0;border-bottom:1px dashed rgba(128,128,128,.22)}
+.routine-item .head{display:flex;align-items:flex-start;gap:10px}
+.routine-item .head .grow{flex:1;min-width:0}
+.routine-item .rt{font-size:13px;line-height:1.5;word-break:break-all}
+
 .sub-h{
   font-size:13px;color:var(--text-dim);margin:2px 0 -2px;
   display:flex;align-items:center;gap:6px;
@@ -468,6 +481,22 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
       <div class="card wide">
         <h2 id="planListTitle">今天的事</h2>
         <div id="planList"></div>
+      </div>
+      <div class="card wide">
+        <h2>🔁 每日例行</h2>
+        <p class="hint" style="margin-top:0">固定要做的事设一次，每天自动出现，不用重复添加；勾选状态每天独立重新计</p>
+        <div id="planRoutineList"></div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)">
+          <div class="row">
+            <input type="text" id="routineText" placeholder="每天固定要做的事，如：看昨日业绩数据">
+          </div>
+          <div class="row" style="margin-top:10px;flex-wrap:wrap;align-items:center;gap:8px">
+            <input type="time" id="routineTime" style="width:118px">
+            <span id="routineDays"></span>
+            <button class="btn" onclick="Plan.addRoutine()">设为每日例行</button>
+          </div>
+          <p class="hint">时间可不填；点星期几可以只在选中的日子重复</p>
+        </div>
       </div>
       <div class="card wide">
         <h2 id="planAddTitle">加一件事</h2>
