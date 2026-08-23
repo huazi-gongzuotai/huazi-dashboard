@@ -1,12 +1,11 @@
 /* ==== 功能：日历·计划 START ====
-   月历视图 + 每日事项（可带时间段）+ 每日例行（长期计划）+ 思考的事（备忘池）。
-   事项存在任何一天，到期那天自动出现在"今天"；
-   过了当天还没做完的，进"过期未完成"提醒区，不会无声消失。
-   每日例行：设一次，从当天起自动出现在每天的清单里，勾选状态每天独立；
-   可以只在周几重复、可以暂停、可以跳过某一天。
+   月历视图 + 每日待办（可带时间段）+ 每日例行（独立清单）+ 思考的事（备忘池）。
+   待办事项存在任何一天，到期那天自动出现在"今天"；
+   过了当天还没做完的，进"过期未完成"提醒区（蓝点），不会无声消失。
+   每日例行：设一次，每天的例行清单独立勾选；例行不参与过期提醒，不在月历显示圆点。
+   例行和待办是两个独立板块，互不干扰。
    思考的事：临时想到但不急着做的事，无日期无时间；想好了点「→待办」转成今天的待办。
-   优先级：📌 置顶。事项、例行、思考都可置顶，置顶的排最前；
-   例行置顶后每天生成的清单事项也置顶；完成的事项沉到最下面。
+   优先级：📌 置顶。事项、例行、思考都可置顶，置顶的排最前；完成的事项沉到最下面。
    数据：plan_events = [{id, date:'YYYY-MM-DD', time:'HH:MM'|'', text, done, top?, routineId?, _u}]
         plan_routines = [{id, text, time:'', days:[0-6], active:true, skip:['YYYY-MM-DD'], top?, _u}]
         plan_thoughts = [{id, text, ts, done?, top?, _u}] */
@@ -22,9 +21,19 @@ const Plan = {
     return Store.list(this.KEY, (a, b) =>
       (a.date + (a.time || '99')) > (b.date + (b.time || '99')) ? 1 : -1);
   },
-  /* 某天的清单：未完成在前 → 置顶最前 → 按时间（完成了就沉底，置顶也随之让位） */
-  of(date){
-    return this.all().filter(e => e.date === date).sort((a, b) => {
+  /* 某天的待办（不含例行）：未完成在前 → 置顶最前 → 按时间 */
+  tasksOf(date){
+    return this.all().filter(e => e.date === date && !e.routineId).sort((a, b) => {
+      const da = a.done ? 1 : 0, db = b.done ? 1 : 0;
+      if (da !== db) return da - db;
+      const pa = a.top ? 0 : 1, pb = b.top ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return (a.time || '99') > (b.time || '99') ? 1 : -1;
+    });
+  },
+  /* 某天的例行清单：同上排序 */
+  routinesOf(date){
+    return this.all().filter(e => e.date === date && e.routineId).sort((a, b) => {
       const da = a.done ? 1 : 0, db = b.done ? 1 : 0;
       if (da !== db) return da - db;
       const pa = a.top ? 0 : 1, pb = b.top ? 0 : 1;
@@ -34,7 +43,7 @@ const Plan = {
   },
   overdue(){
     const t = Util.today();
-    return this.all().filter(e => !e.done && e.date < t);
+    return this.all().filter(e => !e.done && !e.routineId && e.date < t);
   },
   /* 例行列表：置顶最前 → 按时间 */
   routines(){
@@ -62,12 +71,13 @@ const Plan = {
       const d = new Date(this.view + 'T00:00:00');
       this.calY = d.getFullYear(); this.calM = d.getMonth();
     }
-    this.materialize(this.view);
+    this.materialize(Util.today());
     this.renderTitle();
     this.renderCal();
     this.renderList();
     this.renderOverdue();
     this.renderThoughts();
+    this.renderRoutineDay();
     this.renderRoutines();
     this.renderDayChips();
     // 添加表单默认值
@@ -113,8 +123,8 @@ const Plan = {
     const first = new Date(this.calY, this.calM, 1);
     const lead = first.getDay();                       // 1 号前面空几格（周日=0）
     const days = new Date(this.calY, this.calM + 1, 0).getDate();
-    // 预取事件：有事的日期 → 是否有过期未完成
-    const ev = this.all();
+    // 预取事件：有事的日期 → 是否有过期未完成（只统计待办，不含例行）
+    const ev = this.all().filter(e => !e.routineId);
     const hasEv = {}, hasOver = {};
     ev.forEach(e => {
       if (e.date.slice(0,7) === `${this.calY}-${String(this.calM+1).padStart(2,'0')}`){
@@ -137,7 +147,7 @@ const Plan = {
   },
 
   renderList(){
-    const list = this.of(this.view);
+    const list = this.tasksOf(this.view);
     document.getElementById('planListTitle').textContent =
       this.view === Util.today() ? '今天的事' : '这天的事';
     const box = document.getElementById('planList');
@@ -148,7 +158,6 @@ const Plan = {
     box.innerHTML = list.map(e => `
       <div class="item ${e.done ? 'done' : ''} ${e.top ? 'pinned' : ''}">
         <button class="box" onclick="Plan.toggle('${e.id}')">${e.done ? '✓' : ''}</button>
-        ${e.routineId ? '<span class="time-tag" style="color:var(--text2);background:rgba(140,130,120,.14)">🔁</span>' : ''}
         ${e.time ? `<span class="time-tag ${(!e.done && e.date < Util.today()) ? 'overdue' : ''}">${e.time}</span>` : ''}
         <span class="grow">${Util.esc(e.text)}</span>
         <button class="pin ${e.top ? 'on' : ''}" title="${e.top ? '取消置顶' : '置顶'}" onclick="Plan.pin('${e.id}')">📌</button>
@@ -202,6 +211,23 @@ const Plan = {
       `<span class="day-chip ${this._days.indexOf(i) >= 0 ? 'on' : ''}" onclick="Plan.toggleDay(${i})">${w}</span>`).join('');
   },
 
+  renderRoutineDay(){
+    const list = this.routinesOf(Util.today());
+    const box = document.getElementById('planRoutineDay');
+    if (!list.length){
+      box.innerHTML = '<div class="empty">今天没有例行事项</div>';
+      return;
+    }
+    box.innerHTML = list.map(e => `
+      <div class="item ${e.done ? 'done' : ''} ${e.top ? 'pinned' : ''}">
+        <button class="box" onclick="Plan.toggle('${e.id}')">${e.done ? '✓' : ''}</button>
+        ${e.time ? `<span class="time-tag">${e.time}</span>` : ''}
+        <span class="grow">${Util.esc(e.text)}</span>
+        <button class="pin ${e.top ? 'on' : ''}" title="${e.top ? '取消置顶' : '置顶'}" onclick="Plan.pinRoutineDay('${e.id}')">📌</button>
+        <button class="del" onclick="Plan.delRoutineDay('${e.id}')" title="今天跳过这条">✕</button>
+      </div>`).join('');
+  },
+
   renderThoughts(){
     const list = this.thoughts();
     const box = document.getElementById('planThoughtList');
@@ -250,7 +276,7 @@ const Plan = {
     document.getElementById('routineText').value = '';
     document.getElementById('routineTime').value = '';
     this._days = [0,1,2,3,4,5,6];
-    this.materialize(this.view);
+    this.materialize(Util.today());
     this.render();
     UI.toast('已加入每日例行');
   },
@@ -277,7 +303,7 @@ const Plan = {
         if (e.routineId === id && !e.done && e.date >= Util.today()) Store.softDelete(this.KEY, e.id);
       });
     } else {
-      this.materialize(this.view);
+      this.materialize(Util.today());
     }
     this.render();
   },
@@ -330,6 +356,24 @@ const Plan = {
     });
     this.render();
     UI.toast(top ? '这条例行已置顶' : '已取消置顶');
+  },
+
+  /* 置顶今天的一条例行（只影响今天，不弹确认框） */
+  pinRoutineDay(id){
+    const e = this.all().find(x => x.id === id);
+    if (!e) return;
+    Store.upsert(this.KEY, Object.assign({}, e, { top: !e.top }));
+    this.renderRoutineDay();
+  },
+
+  /* 今天跳过一条例行（写进 skip，明天照常出现） */
+  delRoutineDay(id){
+    const e = this.all().find(x => x.id === id);
+    if (!e || !e.routineId) return;
+    const r = this.routines().find(x => x.id === e.routineId);
+    if (r) Store.upsert(this.RKEY, Object.assign({}, r, { skip: (r.skip || []).concat([e.date]) }));
+    Store.softDelete(this.KEY, id);
+    this.renderRoutineDay();
   },
 
   /* ==== 思考的事 ==== */
