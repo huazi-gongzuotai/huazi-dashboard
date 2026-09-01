@@ -54,6 +54,7 @@
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --ease:cubic-bezier(.4,0,.2,1);
   --dur:.18s;
+  --sidew:76px;       /* 侧边栏宽度；弹层 inset 让出这一列，避免压在侧栏上 */
 }
 
 /* ==== 基础 ==== */
@@ -208,7 +209,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
 
 /* ════════ 平板与横屏：侧栏展开成图标配文字 ════════ */
 @media (min-width:700px){
-  :root{--fs-hero:48px;--fs-title:26px;--pad:24px;--gap:16px}
+  :root{--fs-hero:48px;--fs-title:26px;--pad:24px;--gap:16px;--sidew:200px}
   .side{width:200px;padding-left:12px;padding-right:12px}
   .brand{text-align:left;padding:0 8px;margin-bottom:22px}
   .brand .logo{font-size:30px}
@@ -355,9 +356,12 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
 .fitem button:active{opacity:.6}
 .dropzone{border:2px dashed rgba(128,128,128,.35);border-radius:calc(var(--radius) - 6px);padding:14px;text-align:center;color:var(--text-dim);font-size:14px;margin-top:12px}
 .dropzone.over{border-color:var(--accent);color:var(--accent);background:rgba(169,113,75,.08)}
-.overlay{position:fixed;inset:0;background:rgba(30,24,18,.45);z-index:60;display:flex;align-items:center;justify-content:center;padding:18px}
+.overlay{position:fixed;inset:0;left:var(--sidew);background:rgba(30,24,18,.45);z-index:60;display:flex;align-items:center;justify-content:center;padding:18px}
 .modal{background:var(--card);border-radius:var(--radius);padding:18px;width:100%;max-width:430px;box-shadow:0 14px 44px rgba(0,0,0,.28)}
 .modal.wide{max-width:780px}
+/* 图片预览弹层: 不超过视口高度，内容溢出可滚动；超高图也能看到顶部的标题栏和关闭按钮 */
+.modal.img-preview{max-width:90%;max-height:calc(100vh - 36px);max-height:calc(100dvh - 36px);display:flex;flex-direction:column}
+.modal.img-preview .view-body{flex:1;min-height:0;overflow:auto}
 .modal h2{font-size:16px;font-weight:600;margin-bottom:12px}
 .file-miss{color:var(--text-dim);font-size:14px;line-height:1.8;padding:22px 0;text-align:center}
 #refViewBody iframe,#refViewBody embed{width:100%;height:60vh;border:none;border-radius:calc(var(--radius) - 8px);background:#fff}
@@ -390,8 +394,8 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
 .memo-item .mp{font-size:13px;color:var(--text-dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .memo-item .md{font-size:11px;color:var(--text-dim);margin-top:2px}
 
-/* 通用图片预览弹层 body */
-.view-body img{max-width:100%;border-radius:calc(var(--radius) - 8px)}
+/* 通用图片预览弹层 body —— img 必须自带高度上限，否则超高海报/长截图会撑出视口 */
+.view-body img{max-width:100%;width:auto;height:auto;max-height:calc(100vh - 170px);max-height:calc(100dvh - 170px);object-fit:contain;border-radius:calc(var(--radius) - 8px)}
 
 /* ===== 业绩看板 v2：皮肤/外科拆分 + 月历 ===== */
 .perf-split{display:flex;flex-direction:column;gap:10px}
@@ -446,7 +450,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
    需要占满的重要卡片（英雄卡、长列表）加 class="card wide"。
    放在样式表最后，确保能覆盖前面的默认规则。 */
 @media (min-width:1100px){
-  :root{--fs-hero:56px;--fs-title:30px;--pad:30px;--gap:20px}
+  :root{--fs-hero:56px;--fs-title:30px;--pad:30px;--gap:20px;--sidew:240px}
   .side{width:240px}
   .main{padding:36px 44px 52px}
   .page.on{
@@ -642,8 +646,8 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
 
       <!-- 图片预览弹层 -->
       <div class="overlay" id="docImgOverlay" style="display:none" onclick="if(event.target===this)Docs.closeImg()">
-        <div class="modal" style="max-width:90%">
-          <div class="row" style="margin-bottom:10px">
+        <div class="modal img-preview">
+          <div class="row" style="margin-bottom:10px;flex-shrink:0">
             <span id="docImgTitle" style="flex:1;font-weight:600"></span>
             <button class="btn ghost" title="重命名" onclick="Docs.renameImg(Docs._viewImgId)">✏</button>
             <button class="btn ghost" onclick="Docs.closeImg()">✕</button>
@@ -778,8 +782,8 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
       </div>
       <input type="file" id="memoFile" accept="image/*" multiple style="display:none">
       <div class="overlay" id="memoImgOverlay" style="display:none" onclick="if(event.target===this)Memo.closeImg()">
-        <div class="modal" style="max-width:90%">
-          <div class="row" style="margin-bottom:10px">
+        <div class="modal img-preview">
+          <div class="row" style="margin-bottom:10px;flex-shrink:0">
             <span id="memoImgTitle" style="flex:1;font-weight:600"></span>
             <button class="btn ghost" onclick="Memo.closeImg()">✕</button>
           </div>
@@ -1300,21 +1304,36 @@ const Util = {
   esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
 
   // 图片必须压缩后再存，否则几张手机原图就撑爆 localStorage
+  // 还要处理 EXIF 方向：手机拍的竖版照片带 orientation，<img> 显示会自动转，
+  // 但 canvas.drawImage 不读 EXIF——必须用 createImageBitmap(imageOrientation:'from-image')
   compressImage(file, maxW = 800, quality = .72){
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, maxW / img.width);
-        const cv = document.createElement('canvas');
-        cv.width  = img.width  * scale;
-        cv.height = img.height * scale;
-        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-        resolve(cv.toDataURL('image/jpeg', quality));
-        URL.revokeObjectURL(img.src);
-      };
-      img.onerror = reject;
-      img.src = URL.createObjectURL(file);
-    });
+    return (async () => {
+      let img, w, h, dispose;
+      if (window.createImageBitmap){
+        try {
+          const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+          img = bmp; w = bmp.width; h = bmp.height;
+          dispose = () => bmp.close && bmp.close();
+        } catch (_) { /* 老浏览器或不支持该选项时走下面的 fallback */ }
+      }
+      if (!img){
+        img = await new Promise((res, rej) => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.onerror = rej;
+          im.src = URL.createObjectURL(file);
+        });
+        w = img.width; h = img.height;
+      }
+      const scale = Math.min(1, maxW / w);
+      const cv = document.createElement('canvas');
+      cv.width  = Math.round(w * scale);
+      cv.height = Math.round(h * scale);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      const data = cv.toDataURL('image/jpeg', quality);
+      dispose && dispose();
+      return data;
+    })();
   },
 
   fmtSize(n){
